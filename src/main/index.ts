@@ -1,4 +1,6 @@
 import { app, BrowserWindow } from 'electron'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { loadCachedPreflight, runPreflight } from './claude/preflight.ts'
 import { closeDatabase, openDatabase } from './db/client.ts'
 import { applyMigrations, interruptStaleRuns } from './db/migrate.ts'
@@ -12,6 +14,19 @@ import type { TrpcContext } from './trpc/context.ts'
 import { createMainWindow } from './window.ts'
 
 async function bootstrap(): Promise<void> {
+  // Packaged mac builds take the dock icon from the bundled icon.icns; in dev
+  // we are running the stock Electron binary, so set it explicitly.
+  if (!app.isPackaged && process.platform === 'darwin' && app.dock) {
+    const devIcon = path.join(app.getAppPath(), 'build', 'icon.png')
+    if (existsSync(devIcon)) {
+      try {
+        app.dock.setIcon(devIcon)
+      } catch (err) {
+        console.warn('[rivju] dock icon failed', err)
+      }
+    }
+  }
+
   const paths = resolvePaths()
   ensureDirs(paths)
 
