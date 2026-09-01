@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Bot, GitMerge, KeyRound, LoaderCircle, Play, Square } from 'lucide-react'
+import { GitMerge, KeyRound, LoaderCircle, Play, Square } from 'lucide-react'
+import { RivjuLogo } from '#/components/brand/logo.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { useTrpc } from '#/lib/trpc.tsx'
 import { useRuns } from '../runs/runs-store.tsx'
@@ -23,11 +24,9 @@ export function Sidebar() {
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--foam)]">
       <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--hero-b)]">
-          <Bot className="size-5 text-[var(--palm)]" />
-        </span>
+        <RivjuLogo className="size-9 shrink-0 rounded-xl shadow-sm" />
         <div>
-          <p className="font-bold text-[var(--sea-ink)]">rivju</p>
+          <p className="font-bold leading-tight text-[var(--sea-ink)]">rivju</p>
           <p className="text-xs text-[var(--sea-ink-soft)]">
             run stream {connected ? 'live' : 'connecting…'}
           </p>

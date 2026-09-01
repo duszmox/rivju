@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { CircleAlert, LoaderCircle, RotateCcw } from 'lucide-react'
 import { useState  } from 'react'
 import type {ReactNode} from 'react';
+import { RivjuLogo } from '#/components/brand/logo.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { useQueryClientInstance, useTrpc, useTrpcClient } from '#/lib/trpc.tsx'
 
@@ -64,9 +65,13 @@ export function PreflightGate({ children }: { children: ReactNode }) {
 
   if (preflight.isPending || preflight.data.status === 'pending') {
     return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center gap-3 bg-background">
-        <LoaderCircle className="size-6 animate-spin text-[var(--lagoon-deep)]" />
-        <p className="text-sm text-[var(--sea-ink-soft)]">Checking the claude CLI…</p>
+      <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background">
+        <RivjuLogo className="size-16 rounded-2xl shadow-md" />
+        <p className="text-lg font-bold text-[var(--sea-ink)]">rivju</p>
+        <div className="flex items-center gap-2">
+          <LoaderCircle className="size-4 animate-spin text-[var(--lagoon-deep)]" />
+          <p className="text-sm text-[var(--sea-ink-soft)]">Checking the claude CLI…</p>
+        </div>
       </div>
     )
   }
