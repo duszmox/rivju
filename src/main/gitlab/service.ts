@@ -40,6 +40,8 @@ export interface ProjectView {
 export interface MergeRequestListItem {
   instanceId: string
   instanceLabel: string
+  /** Repo path with namespace, e.g. `acme/rivju-core` — null when unknown. */
+  projectPath: string | null
   baseUrl: string
   gitlabProjectId: number
   iid: number
@@ -427,6 +429,7 @@ function toListItem(instance: GitlabInstanceRow, mr: GitlabMergeRequest): MergeR
   return {
     instanceId: instance.id,
     instanceLabel: instance.label,
+    projectPath: projectPathFromMr(mr),
     baseUrl: instance.baseUrl,
     gitlabProjectId: mr.project_id ?? 0,
     iid: mr.iid,
@@ -438,6 +441,24 @@ function toListItem(instance: GitlabInstanceRow, mr: GitlabMergeRequest): MergeR
     targetBranch: mr.target_branch,
     updatedAt: mr.updated_at ?? null,
     draft: mr.draft ?? mr.work_in_progress ?? false,
+  }
+}
+
+/**
+ * Repo path with namespace for an MR: prefer `references.full`
+ * (`namespace/project!iid`, GitLab 12+), fall back to the `web_url`
+ * (`/namespace/project/-/merge_requests/iid`).
+ */
+function projectPathFromMr(mr: GitlabMergeRequest): string | null {
+  const fromReferences = mr.references?.full?.replace(/!\d+$/, '')
+  if (fromReferences) return fromReferences
+  try {
+    const path = new URL(mr.web_url).pathname
+    const idx = path.indexOf('/-/')
+    const repoPath = idx === -1 ? null : path.slice(1, idx)
+    return repoPath || null
+  } catch {
+    return null
   }
 }
 

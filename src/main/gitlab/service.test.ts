@@ -233,6 +233,9 @@ describe('review queue (default filter across instances)', () => {
     expect(queue.items.map((i) => i.iid).sort((a, b) => a - b)).toEqual([57, 101])
     // most recently updated first
     expect(queue.items[0].iid).toBe(101)
+    // repo path: from references.full, falling back to web_url parsing
+    expect(queue.items[0].projectPath).toBe('acme/rivju-core')
+    expect(queue.items[1].projectPath).toBe('acme/infra-scripts')
   })
 
   it('continues across instances when one fails', async () => {
