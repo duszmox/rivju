@@ -5,7 +5,11 @@ import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query'
 import { observable } from '@trpc/server/observable'
 import { createContext, useContext, useMemo  } from 'react'
 import type {ReactNode} from 'react';
+import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '../../main/trpc/router.ts'
+
+/** Return types of every procedure, for components that render them. */
+export type RouterOutput = inferRouterOutputs<AppRouter>
 
 /**
  * Our own tRPC-over-IPC link. Emits exactly the envelopes tRPC's client

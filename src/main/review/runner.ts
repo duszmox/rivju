@@ -19,6 +19,9 @@ import { spawnReviewProcess } from './process.ts'
 import { composeReviewPrompt, composeVerifyPrompt, REVIEW_SYSTEM_PROMPT, VERIFY_SYSTEM_PROMPT } from './prompt.ts'
 import { collectRejectedFindings } from './rejected.ts'
 import { createVerifyMcp, reanchorOpenFindings } from './verify.ts'
+import { resolveSkillContext } from '../skills/resolve.ts'
+import { ensureRunPluginDirs } from '../skills/service.ts'
+import { parseEffort, resolveModelSelection } from '../settings/service.ts'
 import type { RivjuDatabase } from '../db/client.ts'
 import type { RunKind, RunRow, RunUsage } from '../db/schema.ts'
 
@@ -29,7 +32,6 @@ const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
 const VERIFY_DEFAULT_MAX_TURNS = 15
 const VERIFY_DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
 const MAX_TIMEOUT_MS = 2 * 60 * 60 * 1000
-const EFFORTS = new Set<EffortLevel>(['low', 'medium', 'high', 'xhigh', 'max'])
 
 export type StartReviewInput = {
   instanceId: string
@@ -68,7 +70,7 @@ export function startReview(input: StartReviewInput): RunRow {
   const db = getDb()
   const context = lookupContext(input)
   const selection = resolveSelection(input, context.project)
-  const enabledSkills = resolveEnabledSkills(context.project.id)
+  const enabledSkills = resolveRunSkills(context.project).skills
   const paths = resolvePaths()
   const runId = crypto.randomUUID()
   const logPath = path.join(paths.logsDir, `${runId}.jsonl`)
@@ -295,17 +297,12 @@ async function runFullFlow(flow: ReviewFlow): Promise<void> {
     onFinished: () => { completion.finished = true },
   })
   const preflight = requirePreflight()
-  const userPlugin = path.join(resolvePaths().skillsDir, 'user')
-  const projectPlugin = path.join(
-    resolvePaths().skillsDir,
-    'project',
-    context.project.instanceId,
-    ...context.project.pathWithNamespace.split('/'),
-  )
-  const plugins = [{ type: 'local' as const, path: userPlugin, skipMcpDiscovery: true }]
-  if (resolveEnabledSkills(context.project.id).some((name) =>
-    db.select().from(skill).where(eq(skill.name, name)).all().some((entry) => entry.projectId === context.project.id),
-  )) plugins.push({ type: 'local' as const, path: projectPlugin, skipMcpDiscovery: true })
+  // Resolved once more at launch time (not reused from the queued row) so a
+  // toggle made while the run was waiting in the queue takes effect, and so
+  // the plugin directories are guaranteed to exist before the SDK reads them.
+  const skillContext = resolveRunSkills(context.project)
+  await ensureRunPluginDirs(skillContext.projectPluginDir ? projectRefOf(context.project) : null)
+  db.update(run).set({ enabledSkills: skillContext.skills }).where(eq(run.id, item.runId)).run()
 
   emitPhase(item.runId, 'reviewing', `Reviewing ${diff.files.length} changed files`)
   const prompt = composeReviewPrompt({
@@ -328,7 +325,9 @@ async function runFullFlow(flow: ReviewFlow): Promise<void> {
       headSha: item.headSha,
       model: row.model,
       effort: row.effort,
-      enabledSkills: row.enabledSkills ?? [],
+      enabledSkills: skillContext.skills,
+      plugins: skillContext.plugins.map((plugin) => plugin.path),
+      settingSources: skillContext.settingSources,
       cwd: worktreePath,
     },
   })
@@ -338,8 +337,8 @@ async function runFullFlow(flow: ReviewFlow): Promise<void> {
       cwd: worktreePath,
       pathToClaudeCodeExecutable: preflight.claudePath,
       settingSources: [],
-      plugins,
-      skills: row.enabledSkills ?? [],
+      plugins: skillContext.plugins,
+      skills: skillContext.skills,
       mcpServers: { rivju: mcp },
       strictMcpConfig: true,
       tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill'],
@@ -448,6 +447,10 @@ async function runVerifyFlow(flow: ReviewFlow): Promise<void> {
       cwd: worktreePath,
       pathToClaudeCodeExecutable: preflight.claudePath,
       settingSources: [],
+      // Verification is deliberately skill-free. The option must be present and
+      // empty: omitting `skills` makes the CLI load every skill it discovered,
+      // which here means Claude Code's own bundled ones.
+      skills: [],
       mcpServers: { rivju: mcp },
       strictMcpConfig: true,
       tools: ['Read', 'Grep', 'Glob', 'Bash'],
@@ -577,24 +580,29 @@ function resolveSelection(
   input: Pick<StartReviewInput, 'model' | 'effort'>,
   projectRow: typeof project.$inferSelect,
 ) {
-  const preflight = getPreflightState()
-  if (preflight.status !== 'ok') throw new Error('Claude preflight must succeed before launching a review')
-  const globalModel = settingValue('review.default_model')
-  const model = input.model ?? projectRow.modelOverride ?? globalModel ?? preflight.models[0]?.value
-  const available = preflight.models.find((item) => item.value === model || item.resolvedModel === model)
-  if (!model || !available) throw new Error('Choose a model reported by the live Claude preflight')
-  const effort = input.effort ?? parseEffort(projectRow.effortOverride ?? settingValue('review.default_effort'))
-  if (effort && (!available.supportsEffort || !available.supportedEffortLevels?.includes(effort))) {
-    throw new Error(`${available.displayName} does not support effort ${effort}`)
-  }
-  return { model, effort: effort ?? null }
+  return resolveModelSelection({ projectRow, model: input.model, effort: input.effort })
 }
 
-function resolveEnabledSkills(projectId: string): string[] {
-  return getDb().select().from(skill).all()
-    .filter((row) => row.enabled && (row.scope === 'user' || row.projectId === projectId))
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((row) => row.name)
+function projectRefOf(projectRow: typeof project.$inferSelect) {
+  return {
+    id: projectRow.id,
+    instanceId: projectRow.instanceId,
+    pathWithNamespace: projectRow.pathWithNamespace,
+  }
+}
+
+/**
+ * The SDK inputs for a run, from the single shared resolver the "what this run
+ * will load" preview also uses. Names come back plugin-qualified so a
+ * project-scoped copy of a user skill replaces the original instead of loading
+ * alongside it.
+ */
+function resolveRunSkills(projectRow: typeof project.$inferSelect) {
+  return resolveSkillContext({
+    rows: getDb().select().from(skill).all(),
+    skillsDir: resolvePaths().skillsDir,
+    project: projectRefOf(projectRow),
+  })
 }
 
 function settingValue(key: string): string | null {
@@ -618,10 +626,6 @@ export function parseBoundedSettingNumber(
 
 function concurrencyLimit(): number {
   return settingNumber('review.max_concurrent_runs', DEFAULT_CONCURRENCY, 1, MAX_CONCURRENCY)
-}
-
-function parseEffort(value: string | null | undefined): EffortLevel | undefined {
-  return value && EFFORTS.has(value as EffortLevel) ? value as EffortLevel : undefined
 }
 
 function isSha(value: string): boolean {

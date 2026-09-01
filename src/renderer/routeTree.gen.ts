@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as InstancesRouteImport } from './routes/instances'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as InstancesInstanceIdRouteImport } from './routes/instances_.$instanceId'
 import { Route as MrsInstanceIdGitlabProjectIdIidRouteImport } from './routes/mrs.$instanceId.$gitlabProjectId.$iid'
 
@@ -22,6 +24,16 @@ const IndexRoute = IndexRouteImport.update({
 const InstancesRoute = InstancesRouteImport.update({
   id: '/instances',
   path: '/instances',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SkillsRoute = SkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InstancesInstanceIdRoute = InstancesInstanceIdRouteImport.update({
@@ -39,12 +51,16 @@ const MrsInstanceIdGitlabProjectIdIidRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/instances': typeof InstancesRoute
+  '/settings': typeof SettingsRoute
+  '/skills': typeof SkillsRoute
   '/instances/$instanceId': typeof InstancesInstanceIdRoute
   '/mrs/$instanceId/$gitlabProjectId/$iid': typeof MrsInstanceIdGitlabProjectIdIidRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/instances': typeof InstancesRoute
+  '/settings': typeof SettingsRoute
+  '/skills': typeof SkillsRoute
   '/instances/$instanceId': typeof InstancesInstanceIdRoute
   '/mrs/$instanceId/$gitlabProjectId/$iid': typeof MrsInstanceIdGitlabProjectIdIidRoute
 }
@@ -52,6 +68,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/instances': typeof InstancesRoute
+  '/settings': typeof SettingsRoute
+  '/skills': typeof SkillsRoute
   '/instances_/$instanceId': typeof InstancesInstanceIdRoute
   '/mrs/$instanceId/$gitlabProjectId/$iid': typeof MrsInstanceIdGitlabProjectIdIidRoute
 }
@@ -60,18 +78,24 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/instances'
+    | '/settings'
+    | '/skills'
     | '/instances/$instanceId'
     | '/mrs/$instanceId/$gitlabProjectId/$iid'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/instances'
+    | '/settings'
+    | '/skills'
     | '/instances/$instanceId'
     | '/mrs/$instanceId/$gitlabProjectId/$iid'
   id:
     | '__root__'
     | '/'
     | '/instances'
+    | '/settings'
+    | '/skills'
     | '/instances_/$instanceId'
     | '/mrs/$instanceId/$gitlabProjectId/$iid'
   fileRoutesById: FileRoutesById
@@ -79,6 +103,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   InstancesRoute: typeof InstancesRoute
+  SettingsRoute: typeof SettingsRoute
+  SkillsRoute: typeof SkillsRoute
   InstancesInstanceIdRoute: typeof InstancesInstanceIdRoute
   MrsInstanceIdGitlabProjectIdIidRoute: typeof MrsInstanceIdGitlabProjectIdIidRoute
 }
@@ -97,6 +123,20 @@ declare module '@tanstack/react-router' {
       path: '/instances'
       fullPath: '/instances'
       preLoaderRoute: typeof InstancesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/skills': {
+      id: '/skills'
+      path: '/skills'
+      fullPath: '/skills'
+      preLoaderRoute: typeof SkillsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/instances_/$instanceId': {
@@ -119,6 +159,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   InstancesRoute: InstancesRoute,
+  SettingsRoute: SettingsRoute,
+  SkillsRoute: SkillsRoute,
   InstancesInstanceIdRoute: InstancesInstanceIdRoute,
   MrsInstanceIdGitlabProjectIdIidRoute: MrsInstanceIdGitlabProjectIdIidRoute,
 }

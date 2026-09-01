@@ -209,13 +209,21 @@ function RepositoryPreparation(props: {
     },
   })
   const preflight = useQuery(trpc.system.preflight.queryOptions(undefined))
+  // The "Default" entries below must name what the layered settings actually
+  // resolve to (global -> project), not simply the first model in the catalog.
+  const effective = useQuery(trpc.settings.effective.queryOptions({
+    instanceId: props.instanceId,
+    gitlabProjectId: props.gitlabProjectId,
+  }))
   const start = useMutation(trpc.runs.start.mutationOptions())
   const [model, setModel] = useState<string>('default')
   const [effort, setEffort] = useState<string>('default')
   const selectedModel = useMemo(() => {
     if (preflight.data?.status !== 'ok') return null
-    return model === 'default' ? preflight.data.models[0] : preflight.data.models.find((item) => item.value === model)
-  }, [model, preflight.data])
+    const resolved = effective.data?.model ?? preflight.data.models[0]?.value
+    const wanted = model === 'default' ? resolved : model
+    return preflight.data.models.find((item) => item.value === wanted || item.resolvedModel === wanted)
+  }, [model, preflight.data, effective.data])
 
   useEffect(() => {
     prepare.mutate(props, { onSettled: () => void status.refetch() })
@@ -262,7 +270,9 @@ function RepositoryPreparation(props: {
             <Select value={model} onValueChange={(value) => { setModel(value); setEffort('default') }}>
               <SelectTrigger size="sm"><SelectValue placeholder="Default model" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="default">Default · {preflight.data.models[0]?.displayName}</SelectItem>
+                <SelectItem value="default">
+                  Default · {effective.data?.modelDisplayName ?? preflight.data.models[0]?.displayName}
+                </SelectItem>
                 {preflight.data.models.map((item) => <SelectItem key={item.value} value={item.value}>{item.displayName}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -270,7 +280,9 @@ function RepositoryPreparation(props: {
               <Select value={effort} onValueChange={setEffort}>
                 <SelectTrigger size="sm"><SelectValue placeholder="Default effort" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Default effort</SelectItem>
+                  <SelectItem value="default">
+                    Default effort{model === 'default' && effective.data?.effort ? ` · ${effective.data.effort}` : ''}
+                  </SelectItem>
                   {selectedModel.supportedEffortLevels?.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
                 </SelectContent>
               </Select>

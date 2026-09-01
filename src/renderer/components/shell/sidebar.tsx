@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { GitMerge, KeyRound, LoaderCircle, Play, Square } from 'lucide-react'
+import { GitMerge, KeyRound, LoaderCircle, Play, Settings, Sparkles, Square } from 'lucide-react'
 import { RivjuLogo } from '#/components/brand/logo.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { useTrpc } from '#/lib/trpc.tsx'
@@ -75,6 +75,20 @@ export function Sidebar() {
         >
           <KeyRound className="size-4" /> GitLab instances
         </Link>
+        <Link
+          to="/skills"
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--sea-ink-soft)] hover:bg-[var(--link-bg-hover)] hover:text-[var(--sea-ink)]"
+          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-[var(--sea-ink)] font-medium' }}
+        >
+          <Sparkles className="size-4" /> Skills
+        </Link>
+        <Link
+          to="/settings"
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--sea-ink-soft)] hover:bg-[var(--link-bg-hover)] hover:text-[var(--sea-ink)]"
+          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-[var(--sea-ink)] font-medium' }}
+        >
+          <Settings className="size-4" /> Settings
+        </Link>
       </nav>
 
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
@@ -137,7 +151,7 @@ export function Sidebar() {
       </div>
 
       <div className="border-t border-[var(--line)] px-4 py-3 text-[10px] text-[var(--sea-ink-soft)]">
-        Phase 4 — review & triage
+        Phase 6 — skills & defaults
       </div>
     </aside>
   )
