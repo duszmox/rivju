@@ -37,7 +37,7 @@ export function SkillEditor({
   return (
     <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="font-mono text-[11px] text-[var(--sea-ink-soft)]">
+        <p className="font-mono text-[11px] text-(--sea-ink-soft)">
           {source.data?.filePath ?? 'loading…'}
           {source.data && !source.data.exists ? ' · missing on disk, saving recreates it' : ''}
         </p>
@@ -70,7 +70,7 @@ export function SkillEditor({
       </div>
 
       {source.isPending ? (
-        <p className="mt-2 text-xs text-[var(--sea-ink-soft)]">Reading SKILL.md…</p>
+        <p className="mt-2 text-xs text-(--sea-ink-soft)">Reading SKILL.md…</p>
       ) : (
         <Textarea
           spellCheck={false}
@@ -91,7 +91,7 @@ export function SkillEditor({
         </div>
       ) : null}
 
-      <p className="mt-2 text-[11px] text-[var(--sea-ink-soft)]">
+      <p className="mt-2 text-[11px] text-(--sea-ink-soft)">
         Frontmatter may contain only <code>name</code> and <code>description</code>. The name is
         fixed — duplicate the skill to use a different one.
       </p>

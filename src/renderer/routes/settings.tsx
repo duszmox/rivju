@@ -58,8 +58,8 @@ function Settings() {
   return (
     <div className="mx-auto max-w-3xl px-8 py-10">
       <p className="island-kicker">Preferences</p>
-      <h1 className="display-title mt-1 text-3xl font-bold text-[var(--sea-ink)]">Settings</h1>
-      <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+      <h1 className="display-title mt-1 text-3xl font-bold text-(--sea-ink)">Settings</h1>
+      <p className="mt-1 text-sm text-(--sea-ink-soft)">
         Model and effort resolve in layers: the global default, then a per-project override, then
         whatever you pick in the launch dialog for one run. The resolved pair is stored on every run
         so a review always records what produced it.
@@ -81,8 +81,8 @@ function Settings() {
       ) : null}
 
       <section className="island-shell mt-6 rounded-2xl p-6">
-        <h2 className="font-semibold text-[var(--sea-ink)]">Appearance</h2>
-        <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+        <h2 className="font-semibold text-(--sea-ink)">Appearance</h2>
+        <p className="mt-1 text-sm text-(--sea-ink-soft)">
           Follow the operating system or pin a fixed theme.
         </p>
         <div className="mt-4 inline-flex rounded-lg border border-[var(--line)] p-1">
@@ -114,8 +114,8 @@ function Settings() {
       </section>
 
       <section className="island-shell mt-8 rounded-2xl p-6">
-        <h2 className="font-semibold text-[var(--sea-ink)]">Global default</h2>
-        <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+        <h2 className="font-semibold text-(--sea-ink)">Global default</h2>
+        <p className="mt-1 text-sm text-(--sea-ink-soft)">
           Used by every project that has no override of its own.
         </p>
         <div className="mt-4 flex flex-wrap items-end gap-4">
@@ -160,12 +160,12 @@ function Settings() {
       </section>
 
       <section className="mt-8">
-        <h2 className="font-semibold text-[var(--sea-ink)]">Per-project overrides</h2>
-        <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+        <h2 className="font-semibold text-(--sea-ink)">Per-project overrides</h2>
+        <p className="mt-1 text-sm text-(--sea-ink-soft)">
           A project that needs a stronger (or cheaper) reviewer than the rest.
         </p>
         {projects.data?.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-[var(--line)] p-6 text-center text-sm text-[var(--sea-ink-soft)]">
+          <p className="mt-4 rounded-xl border border-dashed border-[var(--line)] p-6 text-center text-sm text-(--sea-ink-soft)">
             No projects picked yet.
           </p>
         ) : null}
@@ -174,8 +174,8 @@ function Settings() {
             const target = findModel(models, row.modelOverride ?? globalModel ?? defaults.data?.catalogDefault ?? null)
             return (
               <div key={row.projectId} className="island-shell rounded-xl p-4">
-                <p className="font-medium text-[var(--sea-ink)]">{row.pathWithNamespace}</p>
-                <p className="text-xs text-[var(--sea-ink-soft)]">
+                <p className="font-medium text-(--sea-ink)">{row.pathWithNamespace}</p>
+                <p className="text-xs text-(--sea-ink-soft)">
                   {row.instanceLabel} · resolves to{' '}
                   {row.effective.error
                     ? row.effective.error
@@ -275,7 +275,7 @@ function EffortSelect({
         </SelectContent>
       </Select>
       {levels.length === 0 ? (
-        <p className="text-[11px] text-[var(--sea-ink-soft)]">
+        <p className="text-[11px] text-(--sea-ink-soft)">
           {model ? `${model.displayName} takes no effort setting.` : 'Pick a model first.'}
         </p>
       ) : null}

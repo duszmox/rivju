@@ -46,8 +46,8 @@ function Instances() {
   return (
     <div className="mx-auto max-w-3xl px-8 py-10">
       <p className="island-kicker">GitLab</p>
-      <h1 className="display-title mt-1 text-3xl font-bold text-[var(--sea-ink)]">Instances</h1>
-      <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+      <h1 className="display-title mt-1 text-3xl font-bold text-(--sea-ink)">Instances</h1>
+      <p className="mt-1 text-sm text-(--sea-ink-soft)">
         Connect one or more self-hosted GitLab instances. Tokens are encrypted
         with your OS keychain and never leave this machine in plaintext.
       </p>
@@ -69,8 +69,8 @@ function Instances() {
           submitAdd()
         }}
       >
-        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--sea-ink)]">
-          <Plus className="size-4 text-[var(--palm)]" /> Add instance
+        <p className="flex items-center gap-2 text-sm font-semibold text-(--sea-ink)">
+          <Plus className="size-4 text-(--palm)" /> Add instance
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -125,10 +125,10 @@ function Instances() {
 
       <div className="mt-8 space-y-3">
         {instances.isPending ? (
-          <p className="text-sm text-[var(--sea-ink-soft)]">Loading instances…</p>
+          <p className="text-sm text-(--sea-ink-soft)">Loading instances…</p>
         ) : null}
         {instances.data?.length === 0 ? (
-          <p className="text-sm text-[var(--sea-ink-soft)]">No instances yet.</p>
+          <p className="text-sm text-(--sea-ink-soft)">No instances yet.</p>
         ) : null}
         {instances.data?.map((instance) => (
           <div
@@ -137,8 +137,8 @@ function Instances() {
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="flex items-center gap-2 font-semibold text-[var(--sea-ink)]">
-                  <LockKeyhole className="size-4 text-[var(--palm)]" />
+                <p className="flex items-center gap-2 font-semibold text-(--sea-ink)">
+                  <LockKeyhole className="size-4 text-(--palm)" />
                   {instance.label}
                   {instance.versionWarning ? (
                     <span
@@ -149,7 +149,7 @@ function Instances() {
                     </span>
                   ) : null}
                 </p>
-                <p className="mt-0.5 truncate text-xs text-[var(--sea-ink-soft)]">
+                <p className="mt-0.5 truncate text-xs text-(--sea-ink-soft)">
                   {instance.baseUrl}
                   {instance.username ? ` · ${instance.username}` : ''}
                   {instance.gitlabVersion ? ` · GitLab ${instance.gitlabVersion}` : ''}
@@ -213,7 +213,7 @@ function Instances() {
               </div>
             </div>
             {reAuth.isPending && reAuth.variables.instanceId === instance.id ? (
-              <p className="mt-2 text-xs text-[var(--sea-ink-soft)]">Validating new token…</p>
+              <p className="mt-2 text-xs text-(--sea-ink-soft)">Validating new token…</p>
             ) : null}
             {validate.isError && validate.variables.instanceId === instance.id ? (
               <div className="mt-2">

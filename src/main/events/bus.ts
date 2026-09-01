@@ -10,7 +10,17 @@ export type RunPhase =
   | 'cancelled'
 
 export type RunEvent =
-  | { type: 'run:queued'; runId: string; at: number; position: number }
+  | {
+      type: 'run:queued'
+      runId: string
+      at: number
+      position: number
+      instanceId: string
+      gitlabProjectId: number
+      iid: number
+      sourceBranch: string
+      targetBranch: string
+    }
   | {
       type: 'run:started'
       runId: string

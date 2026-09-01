@@ -56,8 +56,8 @@ function Skills() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="island-kicker">Review skills</p>
-          <h1 className="display-title mt-1 text-3xl font-bold text-[var(--sea-ink)]">Skills</h1>
-          <p className="mt-1 max-w-xl text-sm text-[var(--sea-ink-soft)]">
+          <h1 className="display-title mt-1 text-3xl font-bold text-(--sea-ink)">Skills</h1>
+          <p className="mt-1 max-w-xl text-sm text-(--sea-ink-soft)">
             Skills are the review instructions rivju loads into each run. Switching one off writes a
             flag in rivju&apos;s database and changes the SDK&apos;s skill filter — files are never
             moved, renamed or deleted to turn a skill off.
@@ -86,8 +86,8 @@ function Skills() {
       <section className="mt-8">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="font-semibold text-[var(--sea-ink)]">User-level skills</h2>
-            <p className="text-xs text-[var(--sea-ink-soft)]">
+            <h2 className="font-semibold text-(--sea-ink)">User-level skills</h2>
+            <p className="text-xs text-(--sea-ink-soft)">
               Loaded for every project, in this order.
             </p>
           </div>
@@ -95,7 +95,7 @@ function Skills() {
         </div>
         <div className="mt-3">
           {skills.isPending ? (
-            <p className="text-sm text-[var(--sea-ink-soft)]">Loading skills…</p>
+            <p className="text-sm text-(--sea-ink-soft)">Loading skills…</p>
           ) : (
             <SkillList
               skills={skills.data?.user ?? []}
@@ -112,10 +112,10 @@ function Skills() {
           <section className="mt-8">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="font-semibold text-[var(--sea-ink)]">
+                <h2 className="font-semibold text-(--sea-ink)">
                   Project skills · {project.pathWithNamespace}
                 </h2>
-                <p className="text-xs text-[var(--sea-ink-soft)]">
+                <p className="text-xs text-(--sea-ink-soft)">
                   Loaded only for this project. A project skill with the same name replaces the
                   user-level one.
                 </p>
@@ -146,7 +146,7 @@ function Skills() {
       ) : (
         <section className="mt-8">
           <ImportPanel scope="user" projectId={null} defaultRoot={null} onImported={refresh} />
-          <p className="mt-3 text-xs text-[var(--sea-ink-soft)]">
+          <p className="mt-3 text-xs text-(--sea-ink-soft)">
             Choose a project above to manage project-level skills, import into a project, or distil
             its rejected findings into a rules skill.
           </p>

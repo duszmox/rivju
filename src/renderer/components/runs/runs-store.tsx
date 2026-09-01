@@ -16,6 +16,11 @@ export interface RunSummary {
   queuePosition: number | null
   startedAt: number
   endedAt: number | null
+  instanceId: string | null
+  gitlabProjectId: number | null
+  iid: number | null
+  sourceBranch: string | null
+  targetBranch: string | null
 }
 
 type RunsMap = Record<string, RunSummary>
@@ -34,6 +39,11 @@ function emptySummary(runId: string): RunSummary {
     queuePosition: null,
     startedAt: Date.now(),
     endedAt: null,
+    instanceId: null,
+    gitlabProjectId: null,
+    iid: null,
+    sourceBranch: null,
+    targetBranch: null,
   }
 }
 
@@ -41,7 +51,19 @@ function applyEvent(prev: RunsMap, event: RunEvent): RunsMap {
   const run = prev[event.runId] ?? emptySummary(event.runId)
   switch (event.type) {
     case 'run:queued':
-      return { ...prev, [event.runId]: { ...run, status: 'queued', queuePosition: event.position } }
+      return {
+        ...prev,
+        [event.runId]: {
+          ...run,
+          status: 'queued',
+          queuePosition: event.position,
+          instanceId: event.instanceId,
+          gitlabProjectId: event.gitlabProjectId,
+          iid: event.iid,
+          sourceBranch: event.sourceBranch,
+          targetBranch: event.targetBranch,
+        },
+      }
     case 'run:started':
       return { ...prev, [event.runId]: { ...run, status: 'running', queuePosition: null, startedAt: event.at } }
     case 'run:phase':
@@ -112,6 +134,11 @@ export function RunsProvider({ children }: { children: ReactNode }) {
             costUsd: row.usage?.costUsd ?? 0,
             startedAt: row.startedAt ? new Date(row.startedAt).getTime() : Date.now(),
             endedAt: row.endedAt ? new Date(row.endedAt).getTime() : null,
+            instanceId: row.instanceId,
+            gitlabProjectId: row.gitlabProjectId,
+            iid: row.iid,
+            sourceBranch: row.sourceBranch,
+            targetBranch: row.targetBranch,
           }
         }
         return hydrated

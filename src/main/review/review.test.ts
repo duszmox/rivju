@@ -12,7 +12,7 @@ import { processFindingSubmission } from './mcp.ts'
 import { isReadOnlyBash } from './permissions.ts'
 import { spawnReviewProcess } from './process.ts'
 import { LiveTokenAccumulator } from './usage.ts'
-import { parseBoundedSettingNumber } from './runner.ts'
+import { listRuns, parseBoundedSettingNumber } from './runner.ts'
 import { verifyFindingLocation } from './verifier.ts'
 import { getReview, updateFindingTriage } from './ui.ts'
 
@@ -172,6 +172,21 @@ describe('review numeric settings', () => {
     expect(parseBoundedSettingNumber('0', 40, 1, 200)).toBe(1)
     expect(parseBoundedSettingNumber('500', 40, 1, 200)).toBe(200)
     expect(parseBoundedSettingNumber('invalid', 40, 1, 200)).toBe(40)
+  })
+})
+
+describe('run list navigation metadata', () => {
+  it('includes the merge request coordinates and branches', () => {
+    expect(listRuns()).toMatchObject([
+      {
+        id: runId,
+        instanceId,
+        gitlabProjectId: 1,
+        iid: 7,
+        sourceBranch: 'feature',
+        targetBranch: 'main',
+      },
+    ])
   })
 })
 

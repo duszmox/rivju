@@ -69,11 +69,12 @@ interface Coordinates {
 export function ReviewWorkspace(props: Coordinates & {
   labels: string[]
   diffRefs: { baseSha: string; headSha: string } | null
+  initialRunId?: string
 }) {
   const trpc = useTrpc()
   const queryClient = useQueryClient()
   const { runs: liveRuns } = useRuns()
-  const [runId, setRunId] = useState<string | undefined>()
+  const [runId, setRunId] = useState<string | undefined>(props.initialRunId)
   const detailOptions = trpc.reviews.detail.queryOptions({ ...props, runId })
   const review = useQuery({
     ...detailOptions,
@@ -83,6 +84,10 @@ export function ReviewWorkspace(props: Coordinates & {
       ? 1_500
       : false,
   })
+
+  useEffect(() => {
+    if (props.initialRunId) setRunId(props.initialRunId)
+  }, [props.initialRunId])
 
   useEffect(() => {
     if (!runId && review.data?.selectedRunId)
@@ -265,10 +270,10 @@ function ReviewSurface(props: {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="island-kicker">Review workspace</p>
-          <h2 className="mt-1 text-xl font-bold text-[var(--sea-ink)]">
+          <h2 className="mt-1 text-xl font-bold text-(--sea-ink)">
             {findings.length} {findings.length === 1 ? 'finding' : 'findings'}
           </h2>
-          <p className="mt-1 text-xs text-[var(--sea-ink-soft)]">
+          <p className="mt-1 text-xs text-(--sea-ink-soft)">
             Keyboard: j/k navigate · v valid · x invalid · Enter note
           </p>
         </div>
@@ -342,7 +347,7 @@ function ReviewSurface(props: {
           )}
         </main>
         <aside className="overflow-y-auto border-l border-[var(--line)] bg-[var(--foam)] p-3">
-          <h3 className="px-1 text-xs font-bold uppercase tracking-wider text-[var(--sea-ink-soft)]">
+          <h3 className="px-1 text-xs font-bold uppercase tracking-wider text-(--sea-ink-soft)">
             File & global findings
           </h3>
           {panelFindings.length ? (
@@ -359,7 +364,7 @@ function ReviewSurface(props: {
               />
             ))
           ) : (
-            <p className="px-1 py-8 text-center text-xs text-[var(--sea-ink-soft)]">
+            <p className="px-1 py-8 text-center text-xs text-(--sea-ink-soft)">
               No file- or global-scoped findings in this run.
             </p>
           )}
@@ -433,11 +438,11 @@ function RunOutcome({
   if (run.status === 'done' && findingCount === 0)
     return (
       <div className="mt-4 rounded-xl border border-[var(--chip-line)] bg-[var(--hero-b)] px-4 py-3 text-sm">
-        <p className="font-medium text-[var(--palm)]">
+        <p className="font-medium text-(--palm)">
           <Check className="mr-2 inline size-4" />
           Review completed with zero findings.
         </p>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
+        <p className="mt-1 text-xs leading-relaxed text-(--sea-ink-soft)">
           The agent called finish_review without submitting anything. If that is unexpected, re-run
           the review with a different model, raise effort, or widen the file scope — the run’s JSONL
           log under rivju’s data folder shows exactly what it inspected.
@@ -471,16 +476,16 @@ function VerificationSummary(props: {
   return (
     <div className="island-shell mt-4 rounded-2xl p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="mr-auto text-sm font-bold text-[var(--sea-ink)]">
+        <h3 className="mr-auto text-sm font-bold text-(--sea-ink)">
           Verification results
         </h3>
-        <span className="rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--palm)]">
+        <span className="rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-bold text-(--palm)">
           Fixed {counts.fixed}
         </span>
         <span className="rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--lagoon-deep)]">
           Not fixed {counts.not_fixed}
         </span>
-        <span className="rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--sea-ink-soft)]">
+        <span className="rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-bold text-(--sea-ink-soft)">
           Moot {counts.moot}
         </span>
         {staled.length ? (
@@ -492,7 +497,7 @@ function VerificationSummary(props: {
       {props.run.status === 'done' &&
       props.verifications.length === 0 &&
       props.reanchors.length === 0 ? (
-        <p className="mt-3 text-xs text-[var(--sea-ink-soft)]">
+        <p className="mt-3 text-xs text-(--sea-ink-soft)">
           The verifier reported no verdicts; every target finding remains open.
         </p>
       ) : null}
@@ -505,14 +510,14 @@ function VerificationSummary(props: {
                 key={item.findingId}
                 className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
               >
-                <p className="flex items-center gap-2 text-xs font-semibold text-[var(--sea-ink)]">
+                <p className="flex items-center gap-2 text-xs font-semibold text-(--sea-ink)">
                   <Chip
                     value={VERDICT_LABELS[item.verdict]}
                     tone={
                       item.verdict === 'fixed'
-                        ? 'text-[var(--palm)]'
+                        ? 'text-(--palm)'
                         : item.verdict === 'moot'
-                          ? 'text-[var(--sea-ink-soft)]'
+                          ? 'text-(--sea-ink-soft)'
                           : 'text-[var(--lagoon-deep)]'
                     }
                   />
@@ -520,7 +525,7 @@ function VerificationSummary(props: {
                     {finding?.title ?? item.findingId}
                   </span>
                 </p>
-                <p className="mt-1 text-xs text-[var(--sea-ink-soft)]">
+                <p className="mt-1 text-xs text-(--sea-ink-soft)">
                   {item.justification}
                 </p>
               </li>
@@ -552,7 +557,7 @@ function FileList(props: {
 }) {
   return (
     <aside className="overflow-y-auto border-r border-[var(--line)] bg-[var(--foam)] p-2">
-      <h3 className="px-2 py-2 text-xs font-bold uppercase tracking-wider text-[var(--sea-ink-soft)]">
+      <h3 className="px-2 py-2 text-xs font-bold uppercase tracking-wider text-(--sea-ink-soft)">
         Changed files
       </h3>
       {props.files.length ? (
@@ -565,7 +570,7 @@ function FileList(props: {
               key={file.path}
               type="button"
               onClick={() => props.onSelect(file.path)}
-              className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${props.selected === file.path ? 'bg-[var(--surface-strong)] text-[var(--sea-ink)] shadow-sm' : 'text-[var(--sea-ink-soft)] hover:bg-[var(--link-bg-hover)]'}`}
+              className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${props.selected === file.path ? 'bg-[var(--surface-strong)] text-(--sea-ink) shadow-sm' : 'text-(--sea-ink-soft) hover:bg-[var(--link-bg-hover)]'}`}
             >
               <FileCode2 className="size-3.5 shrink-0" />
               <span
@@ -575,7 +580,7 @@ function FileList(props: {
                 {file.path}
               </span>
               {count ? (
-                <span className="rounded-full bg-[var(--hero-a)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--palm)]">
+                <span className="rounded-full bg-[var(--hero-a)] px-1.5 py-0.5 text-[10px] font-bold text-(--palm)">
                   {count}
                 </span>
               ) : null}
@@ -583,7 +588,7 @@ function FileList(props: {
           )
         })
       ) : (
-        <p className="px-2 py-8 text-center text-xs text-[var(--sea-ink-soft)]">
+        <p className="px-2 py-8 text-center text-xs text-(--sea-ink-soft)">
           No files in this diff.
         </p>
       )}
@@ -721,10 +726,10 @@ function DiffFileView(props: {
     <div className="min-w-[620px]">
       <div className="sticky top-0 z-20 flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface-strong)] px-4 py-2 backdrop-blur">
         <div className="min-w-0">
-          <p className="truncate font-mono text-xs font-semibold text-[var(--sea-ink)]">
+          <p className="truncate font-mono text-xs font-semibold text-(--sea-ink)">
             {props.file.path}
           </p>
-          <p className="text-[10px] text-[var(--sea-ink-soft)]">
+          <p className="text-[10px] text-(--sea-ink-soft)">
             +{props.file.additions} −{props.file.deletions}
             {props.file.truncated ? ' · patch truncated' : ''}
           </p>
@@ -735,7 +740,7 @@ function DiffFileView(props: {
               type="button"
               key={type}
               onClick={() => setViewType(type)}
-              className={`rounded-md px-2 py-1 text-[10px] capitalize ${viewType === type ? 'bg-[var(--hero-a)] text-[var(--sea-ink)]' : 'text-[var(--sea-ink-soft)]'}`}
+              className={`rounded-md px-2 py-1 text-[10px] capitalize ${viewType === type ? 'bg-[var(--hero-a)] text-(--sea-ink)' : 'text-(--sea-ink-soft)'}`}
             >
               {type}
             </button>
@@ -840,11 +845,11 @@ function FindingCard(props: {
         {props.finding.createdRunId === props.run.id ? (
           <Chip value="new" tone="text-[var(--lagoon-deep)]" />
         ) : null}
-        <span className="ml-auto font-mono text-[9px] text-[var(--sea-ink-soft)]">
+        <span className="ml-auto font-mono text-[9px] text-(--sea-ink-soft)">
           run {props.run.id.slice(0, 8)}
         </span>
       </div>
-      <h4 className="mt-2 text-sm font-bold text-[var(--sea-ink)]">
+      <h4 className="mt-2 text-sm font-bold text-(--sea-ink)">
         {props.finding.title}
       </h4>
       {props.finding.body ? <MarkdownText value={props.finding.body} /> : null}
@@ -874,7 +879,7 @@ function FindingCard(props: {
         />
         <button
           type="button"
-          className="ml-auto rounded-md p-1.5 text-[var(--sea-ink-soft)] hover:bg-[var(--hero-a)]"
+          className="ml-auto rounded-md p-1.5 text-(--sea-ink-soft) hover:bg-[var(--hero-a)]"
           title="Edit triage note"
           onClick={() => props.onNote(props.noteOpen ? null : props.finding.id)}
         >
@@ -916,7 +921,7 @@ function FindingCard(props: {
           </div>
         </div>
       ) : props.finding.triageNote ? (
-        <p className="mt-2 rounded-md bg-[var(--foam)] px-2 py-1.5 text-xs italic text-[var(--sea-ink-soft)]">
+        <p className="mt-2 rounded-md bg-[var(--foam)] px-2 py-1.5 text-xs italic text-(--sea-ink-soft)">
           {props.finding.triageNote}
         </p>
       ) : null}
@@ -934,7 +939,7 @@ function TriageButton(props: {
     <button
       type="button"
       onClick={props.onClick}
-      className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold ${props.active ? 'bg-[var(--hero-a)] text-[var(--palm)]' : 'text-[var(--sea-ink-soft)] hover:bg-[var(--foam)]'}`}
+      className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold ${props.active ? 'bg-[var(--hero-a)] text-(--palm)' : 'text-(--sea-ink-soft) hover:bg-[var(--foam)]'}`}
     >
       {props.icon}
       {props.label}
@@ -967,7 +972,7 @@ function FindingComparison(props: {
     <div className="island-shell mt-5 rounded-2xl p-4">
       <div className="flex flex-wrap items-center gap-2">
         <GitCompareArrows className="size-4 text-[var(--lagoon-deep)]" />
-        <h3 className="mr-auto text-sm font-bold text-[var(--sea-ink)]">
+        <h3 className="mr-auto text-sm font-bold text-(--sea-ink)">
           Diff of findings
         </h3>
         <RunPicker
@@ -975,7 +980,7 @@ function FindingComparison(props: {
           value={props.left}
           onChange={props.onLeft}
         />
-        <ChevronRight className="size-4 text-[var(--sea-ink-soft)]" />
+        <ChevronRight className="size-4 text-(--sea-ink-soft)" />
         <RunPicker
           runs={props.runs}
           value={props.right}
@@ -985,8 +990,8 @@ function FindingComparison(props: {
       <div className="mt-4 grid grid-cols-3 gap-3">
         {(
           [
-            ['Added', added, 'text-[var(--palm)]'],
-            ['Unchanged', unchanged, 'text-[var(--sea-ink-soft)]'],
+            ['Added', added, 'text-(--palm)'],
+            ['Unchanged', unchanged, 'text-(--sea-ink-soft)'],
             ['Gone', gone, 'text-destructive'],
           ] as const
         ).map(([label, items, tone]) => (
@@ -1004,7 +1009,7 @@ function FindingComparison(props: {
                     <button
                       type="button"
                       onClick={() => props.onFinding(item)}
-                      className="w-full truncate text-left text-xs text-[var(--sea-ink)] hover:text-[var(--lagoon-deep)]"
+                      className="w-full truncate text-left text-xs text-(--sea-ink) hover:text-[var(--lagoon-deep)]"
                       title={item.title}
                     >
                       {item.title}
@@ -1013,7 +1018,7 @@ function FindingComparison(props: {
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-xs text-[var(--sea-ink-soft)]">None</p>
+              <p className="mt-2 text-xs text-(--sea-ink-soft)">None</p>
             )}
           </div>
         ))}
@@ -1026,7 +1031,7 @@ function SuggestedFix({ value }: { value: string }) {
   const parsed = parseFile(value)
   return (
     <details className="mt-3 rounded-lg border border-[var(--line)] bg-[var(--foam)]">
-      <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[var(--sea-ink)]">
+      <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-(--sea-ink)">
         Suggested fix
       </summary>
       <div className="overflow-x-auto border-t border-[var(--line)]">
@@ -1056,7 +1061,7 @@ function SuggestedFix({ value }: { value: string }) {
 function MarkdownText({ value }: { value: string }) {
   const blocks = value.split(/(```[\s\S]*?```)/g).filter(Boolean)
   return (
-    <div className="mt-2 space-y-2 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
+    <div className="mt-2 space-y-2 text-xs leading-relaxed text-(--sea-ink-soft)">
       {blocks.map((block, index) =>
         block.startsWith('```') ? (
           <pre
@@ -1253,14 +1258,14 @@ function severityTone(value: string | null): string {
     ? 'text-destructive'
     : value === 'medium'
       ? 'text-amber-700'
-      : 'text-[var(--palm)]'
+      : 'text-(--palm)'
 }
 function lifecycleTone(value: FindingRow['lifecycle']): string {
   return value === 'fixed'
-    ? 'text-[var(--palm)]'
+    ? 'text-(--palm)'
     : value === 'stale'
       ? 'text-amber-700'
-      : 'text-[var(--sea-ink-soft)]'
+      : 'text-(--sea-ink-soft)'
 }
 function runLabel(run: ReviewRun): string {
   const date = run.startedAt
@@ -1284,12 +1289,12 @@ function SurfaceState({
 }) {
   return (
     <div
-      className={`${compact ? 'm-6' : 'mt-8'} rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-6 py-10 text-center ${tone === 'error' ? 'text-destructive' : 'text-[var(--sea-ink-soft)]'}`}
+      className={`${compact ? 'm-6' : 'mt-8'} rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-6 py-10 text-center ${tone === 'error' ? 'text-destructive' : 'text-(--sea-ink-soft)'}`}
     >
       <span className="mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--hero-a)]">
         {icon}
       </span>
-      <p className="mt-3 text-sm font-bold text-[var(--sea-ink)]">{title}</p>
+      <p className="mt-3 text-sm font-bold text-(--sea-ink)">{title}</p>
       <p className="mx-auto mt-1 max-w-lg text-xs">{detail}</p>
     </div>
   )

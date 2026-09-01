@@ -18,10 +18,10 @@ function ReviewQueue() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="island-kicker">Review queue</p>
-          <h1 className="display-title mt-1 text-3xl font-bold text-[var(--sea-ink)]">
+          <h1 className="display-title mt-1 text-3xl font-bold text-(--sea-ink)">
             Merge requests awaiting your review
           </h1>
-          <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+          <p className="mt-1 text-sm text-(--sea-ink-soft)">
             MRs where you are reviewer or assignee, across all connected
             instances. Fetched live.
           </p>
@@ -46,11 +46,11 @@ function ReviewQueue() {
       ))}
 
       {queue.isPending ? (
-        <p className="mt-8 text-sm text-[var(--sea-ink-soft)]">Loading review queue…</p>
+        <p className="mt-8 text-sm text-(--sea-ink-soft)">Loading review queue…</p>
       ) : null}
 
       {queue.data && queue.data.items.length === 0 && instances.data?.length !== 0 ? (
-        <p className="mt-8 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mt-8 text-sm text-(--sea-ink-soft)">
           Nothing waiting for review right now.
         </p>
       ) : null}
@@ -68,26 +68,26 @@ function ReviewQueue() {
               className="island-shell flex items-center gap-4 rounded-xl p-4 hover:-translate-y-px"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--hero-b)]">
-                <GitMerge className="size-4 text-[var(--palm)]" />
+                <GitMerge className="size-4 text-(--palm)" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-[var(--sea-ink)]">
+                <span className="block truncate font-medium text-(--sea-ink)">
                   {mr.title}
                   {mr.draft ? (
-                    <span className="ml-2 rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--sea-ink-soft)]">
+                    <span className="ml-2 rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-(--sea-ink-soft)">
                       draft
                     </span>
                   ) : null}
                 </span>
-                <span className="mt-0.5 block truncate text-xs text-[var(--sea-ink-soft)]">
+                <span className="mt-0.5 block truncate text-xs text-(--sea-ink-soft)">
                   {mr.projectPath ?? mr.instanceLabel} · {mr.sourceBranch} → {mr.targetBranch}
                   {mr.author ? ` · by ${mr.author}` : ''}
                 </span>
               </span>
-              <span className="shrink-0 font-mono text-xs text-[var(--sea-ink-soft)]">
+              <span className="shrink-0 font-mono text-xs text-(--sea-ink-soft)">
                 !{mr.iid}
               </span>
-              <ArrowRight className="size-4 shrink-0 text-[var(--sea-ink-soft)]" />
+              <ArrowRight className="size-4 shrink-0 text-(--sea-ink-soft)" />
             </Link>
           </li>
         ))}

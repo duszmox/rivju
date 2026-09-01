@@ -13,17 +13,27 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select.tsx'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select.tsx'
 import { ErrorSurface } from '#/components/errors/error-surface.tsx'
 import { useTrpc } from '#/lib/trpc.tsx'
 import { ReviewWorkspace } from '#/components/review/review-workspace.tsx'
 
 export const Route = createFileRoute('/mrs/$instanceId/$gitlabProjectId/$iid')({
+  validateSearch: (search: Record<string, unknown>): { runId?: string } => ({
+    ...(typeof search.runId === 'string' ? { runId: search.runId } : {}),
+  }),
   component: MergeRequestDetail,
 })
 
 function MergeRequestDetail() {
   const { instanceId, gitlabProjectId, iid } = Route.useParams()
+  const { runId } = Route.useSearch()
   const trpc = useTrpc()
 
   const detail = useQuery(
@@ -36,7 +46,7 @@ function MergeRequestDetail() {
 
   if (detail.isPending) {
     return (
-      <div className="px-8 py-10 text-sm text-[var(--sea-ink-soft)]">
+      <div className="px-8 py-10 text-sm text-(--sea-ink-soft)">
         Loading merge request…
       </div>
     )
@@ -46,7 +56,11 @@ function MergeRequestDetail() {
       <div className="mx-auto max-w-3xl px-8 py-10">
         <ErrorSurface
           heading="Failed to load merge request"
-          raw={detail.error instanceof Error ? detail.error.message : String(detail.error)}
+          raw={
+            detail.error instanceof Error
+              ? detail.error.message
+              : String(detail.error)
+          }
           onRetry={() => void detail.refetch()}
           retrying={detail.isRefetching}
         />
@@ -61,7 +75,7 @@ function MergeRequestDetail() {
 
   return (
     <div className="mx-auto max-w-[1600px] px-8 py-10">
-      <Link to="/" className="text-xs text-[var(--sea-ink-soft)]">
+      <Link to="/" className="text-xs text-(--sea-ink-soft)">
         ← Review queue
       </Link>
 
@@ -69,53 +83,60 @@ function MergeRequestDetail() {
         <div className="min-w-0">
           <p className="island-kicker flex items-center gap-2">
             <GitMerge className="size-3.5" />
-            {mr.projectPath ?? mr.instanceLabel} · !{mr.iid}
+            <Link
+              to={`/instances/$instanceId`}
+              className="text-(--sea-ink-soft)"
+              params={{ instanceId: instanceId }}
+            >
+              {mr.projectPath ?? mr.instanceLabel}
+            </Link>
+            ·{' '}
+            <a
+              href={mr.webUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex shrink-0 items-center gap-1.5 text-sm text-(--lagoon-deep)"
+            >
+              !{mr.iid}
+            </a>
           </p>
-          <h1 className="display-title mt-1 text-3xl font-bold text-[var(--sea-ink)]">
+          <h1 className="display-title mt-1 text-3xl font-bold text-(--sea-ink)">
             {mr.title}
           </h1>
         </div>
-        <a
-          href={mr.webUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="flex shrink-0 items-center gap-1.5 text-sm text-[var(--lagoon-deep)]"
-        >
-          <ExternalLink className="size-4" /> Open in GitLab
-        </a>
       </div>
 
       <dl className="island-shell mt-6 grid grid-cols-2 gap-x-8 gap-y-3 rounded-2xl p-6 text-sm sm:grid-cols-3">
         <div>
-          <dt className="text-xs text-[var(--sea-ink-soft)]">Source branch</dt>
-          <dd className="mt-0.5 font-mono text-[var(--sea-ink)]">
+          <dt className="text-xs text-(--sea-ink-soft)">Source branch</dt>
+          <dd className="mt-0.5 font-mono text-(--sea-ink)">
             {mr.sourceBranch}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[var(--sea-ink-soft)]">Target branch</dt>
-          <dd className="mt-0.5 font-mono text-[var(--sea-ink)]">
+          <dt className="text-xs text-(--sea-ink-soft)">Target branch</dt>
+          <dd className="mt-0.5 font-mono text-(--sea-ink)">
             {mr.targetBranch}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[var(--sea-ink-soft)]">Author</dt>
-          <dd className="mt-0.5 text-[var(--sea-ink)]">{mr.author ?? '—'}</dd>
+          <dt className="text-xs text-(--sea-ink-soft)">Author</dt>
+          <dd className="mt-0.5 text-(--sea-ink)">{mr.author ?? '—'}</dd>
         </div>
         <div>
-          <dt className="text-xs text-[var(--sea-ink-soft)]">State</dt>
-          <dd className="mt-0.5 text-[var(--sea-ink)]">{mr.state}</dd>
+          <dt className="text-xs text-(--sea-ink-soft)">State</dt>
+          <dd className="mt-0.5 text-(--sea-ink)">{mr.state}</dd>
         </div>
         <div className="col-span-2 sm:col-span-3">
-          <dt className="text-xs text-[var(--sea-ink-soft)]">Diff refs</dt>
+          <dt className="text-xs text-(--sea-ink-soft)">Diff refs</dt>
           {diffRefs ? (
-            <dd className="mt-1 grid gap-1 font-mono text-xs text-[var(--sea-ink)]">
+            <dd className="mt-1 grid gap-1 font-mono text-xs text-(--sea-ink)">
               <span>base: {diffRefs.baseSha}</span>
               <span>head: {diffRefs.headSha}</span>
               <span>start: {diffRefs.startSha}</span>
             </dd>
           ) : (
-            <dd className="mt-0.5 text-[var(--sea-ink-soft)]">
+            <dd className="mt-0.5 text-(--sea-ink-soft)">
               not reported by GitLab
             </dd>
           )}
@@ -135,18 +156,18 @@ function MergeRequestDetail() {
 
       {description ? (
         <div className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5">
-          <p className="text-xs font-semibold text-[var(--sea-ink-soft)]">
+          <p className="text-xs font-semibold text-(--sea-ink-soft)">
             Description
           </p>
-          <p className="mt-2 text-sm whitespace-pre-wrap text-[var(--sea-ink)]">
+          <p className="mt-2 text-sm whitespace-pre-wrap text-(--sea-ink)">
             {description}
           </p>
         </div>
       ) : null}
 
-      <h2 className="mt-8 text-sm font-semibold text-[var(--sea-ink)]">
+      <h2 className="mt-8 text-sm font-semibold text-(--sea-ink)">
         Changed files{' '}
-        <span className="text-[var(--sea-ink-soft)]">({files.length})</span>
+        <span className="text-(--sea-ink-soft)">({files.length})</span>
       </h2>
       <ul className="mt-3 space-y-1.5">
         {files.map((file) => (
@@ -155,19 +176,19 @@ function MergeRequestDetail() {
             className="flex items-center gap-2.5 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
           >
             {file.newFile ? (
-              <FilePlus className="size-4 shrink-0 text-[var(--palm)]" />
+              <FilePlus className="size-4 shrink-0 text-(--palm)" />
             ) : file.deletedFile ? (
               <FileMinus className="size-4 shrink-0 text-destructive" />
             ) : file.renamedFile ? (
               <FilePen className="size-4 shrink-0 text-[var(--lagoon-deep)]" />
             ) : (
-              <FileCode className="size-4 shrink-0 text-[var(--sea-ink-soft)]" />
+              <FileCode className="size-4 shrink-0 text-(--sea-ink-soft)" />
             )}
-            <span className="truncate font-mono text-xs text-[var(--sea-ink)]">
+            <span className="truncate font-mono text-xs text-(--sea-ink)">
               {file.newPath}
             </span>
             {file.renamedFile && file.oldPath !== file.newPath ? (
-              <span className="shrink-0 text-[10px] text-[var(--sea-ink-soft)]">
+              <span className="shrink-0 text-[10px] text-(--sea-ink-soft)">
                 (renamed from {file.oldPath})
               </span>
             ) : null}
@@ -181,6 +202,7 @@ function MergeRequestDetail() {
         iid={Number(iid)}
         labels={labels}
         diffRefs={diffRefs}
+        initialRunId={runId}
       />
     </div>
   )
@@ -213,10 +235,12 @@ function RepositoryPreparation(props: {
   const preflight = useQuery(trpc.system.preflight.queryOptions(undefined))
   // The "Default" entries below must name what the layered settings actually
   // resolve to (global -> project), not simply the first model in the catalog.
-  const effective = useQuery(trpc.settings.effective.queryOptions({
-    instanceId: props.instanceId,
-    gitlabProjectId: props.gitlabProjectId,
-  }))
+  const effective = useQuery(
+    trpc.settings.effective.queryOptions({
+      instanceId: props.instanceId,
+      gitlabProjectId: props.gitlabProjectId,
+    }),
+  )
   const start = useMutation(trpc.runs.start.mutationOptions())
   const [model, setModel] = useState<string>('default')
   const [effort, setEffort] = useState<string>('default')
@@ -224,7 +248,9 @@ function RepositoryPreparation(props: {
     if (preflight.data?.status !== 'ok') return null
     const resolved = effective.data?.model ?? preflight.data.models[0]?.value
     const wanted = model === 'default' ? resolved : model
-    return preflight.data.models.find((item) => item.value === wanted || item.resolvedModel === wanted)
+    return preflight.data.models.find(
+      (item) => item.value === wanted || item.resolvedModel === wanted,
+    )
   }, [model, preflight.data, effective.data])
 
   useEffect(() => {
@@ -244,14 +270,14 @@ function RepositoryPreparation(props: {
   return (
     <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm">
       {ready || needsScoping ? (
-        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--palm)]" />
+        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-(--palm)" />
       ) : failed ? (
         <span className="text-destructive">×</span>
       ) : (
         <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin text-[var(--lagoon-deep)]" />
       )}
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-[var(--sea-ink)]">
+        <p className="font-medium text-(--sea-ink)">
           {ready
             ? 'Detached checkout ready'
             : needsScoping
@@ -260,7 +286,7 @@ function RepositoryPreparation(props: {
                 ? 'Repository preparation failed'
                 : repoPhaseLabel(phase)}
         </p>
-        <p className="mt-0.5 truncate text-xs text-[var(--sea-ink-soft)]">
+        <p className="mt-0.5 truncate text-xs text-(--sea-ink-soft)">
           {failed
             ? prepare.error instanceof Error
               ? prepare.error.message
@@ -269,39 +295,75 @@ function RepositoryPreparation(props: {
         </p>
         {ready && preflight.data?.status === 'ok' ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Select value={model} onValueChange={(value) => { setModel(value); setEffort('default') }}>
-              <SelectTrigger size="sm"><SelectValue placeholder="Default model" /></SelectTrigger>
+            <Select
+              value={model}
+              onValueChange={(value) => {
+                setModel(value)
+                setEffort('default')
+              }}
+            >
+              <SelectTrigger size="sm">
+                <SelectValue placeholder="Default model" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">
-                  Default · {effective.data?.modelDisplayName ?? preflight.data.models[0]?.displayName}
+                  Default ·{' '}
+                  {effective.data?.modelDisplayName ??
+                    preflight.data.models[0]?.displayName}
                 </SelectItem>
-                {preflight.data.models.map((item) => <SelectItem key={item.value} value={item.value}>{item.displayName}</SelectItem>)}
+                {preflight.data.models.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.displayName}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {selectedModel?.supportsEffort ? (
               <Select value={effort} onValueChange={setEffort}>
-                <SelectTrigger size="sm"><SelectValue placeholder="Default effort" /></SelectTrigger>
+                <SelectTrigger size="sm">
+                  <SelectValue placeholder="Default effort" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="default">
-                    Default effort{model === 'default' && effective.data?.effort ? ` · ${effective.data.effort}` : ''}
+                    Default effort
+                    {model === 'default' && effective.data?.effort
+                      ? ` · ${effective.data.effort}`
+                      : ''}
                   </SelectItem>
-                  {selectedModel.supportedEffortLevels?.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                  {selectedModel.supportedEffortLevels?.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             ) : null}
             <Button
               size="sm"
               disabled={start.isPending}
-              onClick={() => start.mutate({
-                ...props,
-                model: model === 'default' ? undefined : model,
-                effort: effort === 'default' ? undefined : effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max',
-              })}
+              onClick={() =>
+                start.mutate({
+                  ...props,
+                  model: model === 'default' ? undefined : model,
+                  effort:
+                    effort === 'default'
+                      ? undefined
+                      : (effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max'),
+                })
+              }
             >
-              {start.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
+              {start.isPending ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <Play className="size-4" />
+              )}
               Start review
             </Button>
-            {start.isError ? <span className="text-xs text-destructive">{start.error.message}</span> : null}
+            {start.isError ? (
+              <span className="text-xs text-destructive">
+                {start.error.message}
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>

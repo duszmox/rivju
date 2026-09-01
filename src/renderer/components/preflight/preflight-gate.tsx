@@ -41,15 +41,15 @@ export function PreflightGate({ children }: { children: ReactNode }) {
         <div className="w-full max-w-xl rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-8 shadow-sm">
           <div className="flex items-center gap-3">
             <CircleAlert className="size-6 text-destructive" />
-            <h1 className="text-xl font-bold text-[var(--sea-ink)]">
+            <h1 className="text-xl font-bold text-(--sea-ink)">
               rivju can't reach its own backend
             </h1>
           </div>
-          <p className="mt-4 text-sm font-medium text-[var(--sea-ink)]">
+          <p className="mt-4 text-sm font-medium text-(--sea-ink)">
             The renderer could not call the main process. This is an internal transport fault, not
             a problem with your Claude installation.
           </p>
-          <pre className="mt-3 overflow-auto rounded-lg bg-[var(--foam)] p-3 text-xs text-[var(--sea-ink-soft)]">
+          <pre className="mt-3 overflow-auto rounded-lg bg-[var(--foam)] p-3 text-xs text-(--sea-ink-soft)">
             {preflight.error.message}
           </pre>
           <div className="mt-6">
@@ -67,10 +67,10 @@ export function PreflightGate({ children }: { children: ReactNode }) {
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background">
         <RivjuLogo className="size-16 rounded-2xl shadow-md" />
-        <p className="text-lg font-bold text-[var(--sea-ink)]">rivju</p>
+        <p className="text-lg font-bold text-(--sea-ink)">rivju</p>
         <div className="flex items-center gap-2">
           <LoaderCircle className="size-4 animate-spin text-[var(--lagoon-deep)]" />
-          <p className="text-sm text-[var(--sea-ink-soft)]">Checking the claude CLI…</p>
+          <p className="text-sm text-(--sea-ink-soft)">Checking the claude CLI…</p>
         </div>
       </div>
     )
@@ -83,10 +83,10 @@ export function PreflightGate({ children }: { children: ReactNode }) {
         <div className="w-full max-w-xl rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-8 shadow-sm">
           <div className="flex items-center gap-3">
             <CircleAlert className="size-6 text-destructive" />
-            <h1 className="text-xl font-bold text-[var(--sea-ink)]">rivju can't start</h1>
+            <h1 className="text-xl font-bold text-(--sea-ink)">rivju can't start</h1>
           </div>
-          <p className="mt-4 text-sm font-medium text-[var(--sea-ink)]">{message}</p>
-          <p className="mt-2 rounded-lg bg-[var(--foam)] p-3 text-sm text-[var(--sea-ink-soft)]">
+          <p className="mt-4 text-sm font-medium text-(--sea-ink)">{message}</p>
+          <p className="mt-2 rounded-lg bg-[var(--foam)] p-3 text-sm text-(--sea-ink-soft)">
             {hint}
           </p>
           <div className="mt-6 flex items-center gap-3">
@@ -98,7 +98,7 @@ export function PreflightGate({ children }: { children: ReactNode }) {
               )}
               {retrying ? 'Checking…' : 'Retry preflight'}
             </Button>
-            <span className="text-xs text-[var(--sea-ink-soft)]">
+            <span className="text-xs text-(--sea-ink-soft)">
               reason: <code>{reason}</code>
             </span>
           </div>

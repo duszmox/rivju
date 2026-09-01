@@ -4,10 +4,10 @@ import { Button } from '#/components/ui/button.tsx'
 import { useTrpc } from '#/lib/trpc.tsx'
 
 const LINE_STYLE: Record<string, string> = {
-  add: 'bg-[var(--palm)]/10 text-[var(--sea-ink)]',
+  add: 'bg-[var(--palm)]/10 text-(--sea-ink)',
   delete: 'bg-destructive/10 text-destructive line-through',
-  context: 'text-[var(--sea-ink-soft)]',
-  gap: 'bg-[var(--chip-bg)] text-[var(--sea-ink-soft)] italic',
+  context: 'text-(--sea-ink-soft)',
+  gap: 'bg-[var(--chip-bg)] text-(--sea-ink-soft) italic',
 }
 
 const LINE_PREFIX: Record<string, string> = { add: '+', delete: '-', context: ' ', gap: '⋯' }
@@ -36,18 +36,18 @@ export function DistillPanel({
 
   return (
     <div className="island-shell rounded-2xl p-5">
-      <p className="flex items-center gap-2 font-semibold text-[var(--sea-ink)]">
-        <FileDiff className="size-4 text-[var(--palm)]" />
+      <p className="flex items-center gap-2 font-semibold text-(--sea-ink)">
+        <FileDiff className="size-4 text-(--palm)" />
         Distil rejections into a project skill
       </p>
-      <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+      <p className="mt-1 text-sm text-(--sea-ink-soft)">
         Turns every finding a reviewer marked <strong>invalid</strong> in this project into standing
         rules in a <code>rejected-findings</code> skill. Entries are appended — your edits to the
         file are never rewritten.
       </p>
 
       {preview.isPending ? (
-        <p className="mt-3 flex items-center gap-2 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mt-3 flex items-center gap-2 text-sm text-(--sea-ink-soft)">
           <LoaderCircle className="size-4 animate-spin" /> Reading rejections…
         </p>
       ) : null}
@@ -59,11 +59,11 @@ export function DistillPanel({
 
       {data ? (
         <>
-          <p className="mt-3 text-xs text-[var(--sea-ink-soft)]">
+          <p className="mt-3 text-xs text-(--sea-ink-soft)">
             {data.totalRejections} rejected finding{data.totalRejections === 1 ? '' : 's'} ·{' '}
             {data.newEntries} new · {data.alreadyPresent} already in the file
           </p>
-          <p className="mt-0.5 font-mono text-[10px] break-all text-[var(--sea-ink-soft)]">
+          <p className="mt-0.5 font-mono text-[10px] break-all text-(--sea-ink-soft)">
             {data.filePath}
           </p>
 
@@ -92,7 +92,7 @@ export function DistillPanel({
               ))}
             </pre>
           ) : (
-            <p className="mt-3 text-sm text-[var(--sea-ink-soft)]">
+            <p className="mt-3 text-sm text-(--sea-ink-soft)">
               {data.totalRejections === 0
                 ? 'No findings have been marked invalid in this project yet.'
                 : 'Every rejection is already in the rules file.'}

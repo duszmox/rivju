@@ -52,7 +52,12 @@ export type StartVerifyInput = {
   iid: number
 }
 
-type QueuedReview = StartReviewInput & { runId: string; kind: RunKind }
+type QueuedReview = StartReviewInput & {
+  runId: string
+  kind: RunKind
+  sourceBranch: string
+  targetBranch: string
+}
 type ReviewQuery = ReturnType<typeof query>
 type ReviewContext = Awaited<ReturnType<typeof lookupContext>>
 type ActiveReview = {
@@ -87,7 +92,13 @@ export function startReview(input: StartReviewInput): RunRow {
     enabledSkills,
     logPath,
   }).returning().get()
-  pending.push({ ...input, runId, kind: 'full' })
+  pending.push({
+    ...input,
+    runId,
+    kind: 'full',
+    sourceBranch: context.mr.sourceBranch,
+    targetBranch: context.mr.targetBranch,
+  })
   emitQueuePositions()
   queueMicrotask(pumpQueue)
   return row
@@ -140,6 +151,8 @@ export async function startVerifyRun(input: StartVerifyInput): Promise<RunRow> {
     labels: [],
     runId,
     kind: 'verify',
+    sourceBranch: context.mr.sourceBranch,
+    targetBranch: context.mr.targetBranch,
   })
   emitQueuePositions()
   queueMicrotask(pumpQueue)
@@ -177,10 +190,31 @@ export function disposeReviewRuns(): void {
   }
 }
 
-export function listRuns(): RunRow[] {
-  return getDb().select().from(run).all().sort((a, b) =>
-    (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),
-  )
+export function listRuns() {
+  return getDb()
+    .select({
+      run,
+      instanceId: project.instanceId,
+      gitlabProjectId: project.gitlabProjectId,
+      iid: mergeRequest.iid,
+      sourceBranch: mergeRequest.sourceBranch,
+      targetBranch: mergeRequest.targetBranch,
+    })
+    .from(run)
+    .innerJoin(mergeRequest, eq(mergeRequest.id, run.mergeRequestId))
+    .innerJoin(project, eq(project.id, mergeRequest.projectId))
+    .all()
+    .map((item) => ({
+      ...item.run,
+      instanceId: item.instanceId,
+      gitlabProjectId: Number(item.gitlabProjectId),
+      iid: item.iid,
+      sourceBranch: item.sourceBranch,
+      targetBranch: item.targetBranch,
+    }))
+    .sort((a, b) =>
+      (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),
+    )
 }
 
 function pumpQueue(): void {
@@ -644,7 +678,15 @@ function isSha(value: string): boolean {
 
 function emitQueuePositions(): void {
   pending.forEach((item, index) => emitRunEvent({
-    type: 'run:queued', runId: item.runId, at: Date.now(), position: index + 1,
+    type: 'run:queued',
+    runId: item.runId,
+    at: Date.now(),
+    position: index + 1,
+    instanceId: item.instanceId,
+    gitlabProjectId: item.gitlabProjectId,
+    iid: item.iid,
+    sourceBranch: item.sourceBranch,
+    targetBranch: item.targetBranch,
   }))
 }
 

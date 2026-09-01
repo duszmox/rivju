@@ -46,7 +46,7 @@ export function SkillList({
   const remove = useMutation(trpc.skills.delete.mutationOptions())
 
   if (skills.length === 0) {
-    return <p className="rounded-xl border border-dashed border-[var(--line)] p-6 text-center text-sm text-[var(--sea-ink-soft)]">{emptyMessage}</p>
+    return <p className="rounded-xl border border-dashed border-[var(--line)] p-6 text-center text-sm text-(--sea-ink-soft)">{emptyMessage}</p>
   }
 
   return (
@@ -72,13 +72,13 @@ export function SkillList({
             />
             <div className="min-w-0 flex-1">
               <p className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-[var(--sea-ink)]">{skill.name}</span>
-                <span className="rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--sea-ink-soft)]">
+                <span className="font-medium text-(--sea-ink)">{skill.name}</span>
+                <span className="rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-(--sea-ink-soft)">
                   {ORIGIN_LABEL[skill.origin] ?? skill.origin}
                 </span>
                 {skill.shadowedBy ? (
                   <span
-                    className="flex items-center gap-1 rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--sea-ink-soft)]"
+                    className="flex items-center gap-1 rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-(--sea-ink-soft)"
                     title={`Replaced for this project by ${skill.shadowedBy}`}
                   >
                     <EyeOff className="size-3" /> shadowed by the project copy
@@ -90,10 +90,10 @@ export function SkillList({
                   </span>
                 ) : null}
               </p>
-              <p className="mt-0.5 text-xs text-[var(--sea-ink-soft)]">
+              <p className="mt-0.5 text-xs text-(--sea-ink-soft)">
                 {skill.description ?? 'No description.'}
               </p>
-              <p className="mt-1 font-mono text-[10px] text-[var(--sea-ink-soft)]">
+              <p className="mt-1 font-mono text-[10px] text-(--sea-ink-soft)">
                 {skill.active ? skill.qualifiedName : `${skill.qualifiedName} · not loaded`}
               </p>
             </div>

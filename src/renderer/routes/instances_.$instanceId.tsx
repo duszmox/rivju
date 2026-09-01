@@ -53,10 +53,10 @@ function ProjectPicker() {
   return (
     <div className="mx-auto max-w-4xl px-8 py-10">
       <p className="island-kicker">{instance?.label ?? 'Instance'}</p>
-      <h1 className="display-title mt-1 text-3xl font-bold text-[var(--sea-ink)]">
+      <h1 className="display-title mt-1 text-3xl font-bold text-(--sea-ink)">
         Projects
       </h1>
-      <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+      <p className="mt-1 text-sm text-(--sea-ink-soft)">
         Pick the projects you want to review. Picked projects are remembered
         locally; browsing searches the live GitLab API (starred first).
       </p>
@@ -65,7 +65,7 @@ function ProjectPicker() {
 
       <div className="mt-6 flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[var(--sea-ink-soft)]" />
+          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-(--sea-ink-soft)" />
           <Input
             className="pl-9"
             placeholder="Search your projects…"
@@ -76,7 +76,7 @@ function ProjectPicker() {
       </div>
 
       {results.isFetching ? (
-        <p className="mt-4 text-sm text-[var(--sea-ink-soft)]">Searching…</p>
+        <p className="mt-4 text-sm text-(--sea-ink-soft)">Searching…</p>
       ) : null}
       {results.isError ? (
         <p className="mt-4 text-sm text-destructive">
@@ -94,7 +94,7 @@ function ProjectPicker() {
               className="island-shell flex items-center gap-3 rounded-xl p-3"
             >
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5 truncate text-sm font-medium text-[var(--sea-ink)]">
+                <span className="flex items-center gap-1.5 truncate text-sm font-medium text-(--sea-ink)">
                   {project.starred ? (
                     <Star className="size-3.5 shrink-0 fill-[var(--lagoon)] text-[var(--lagoon)]" />
                   ) : null}
@@ -102,7 +102,7 @@ function ProjectPicker() {
                 </span>
               </span>
               {pickedIds.has(String(project.gitlabProjectId)) ? (
-                <span className="flex items-center gap-1 text-xs text-[var(--palm)]">
+                <span className="flex items-center gap-1 text-xs text-(--palm)">
                   <Check className="size-3.5" /> picked
                 </span>
               ) : (
@@ -138,21 +138,21 @@ function ProjectPicker() {
             </li>
           ))}
           {results.data?.length === 0 ? (
-            <li className="text-sm text-[var(--sea-ink-soft)]">
+            <li className="text-sm text-(--sea-ink-soft)">
               No matching projects.
             </li>
           ) : null}
         </ul>
       ) : null}
 
-      <h2 className="mt-10 flex items-center gap-2 text-sm font-semibold text-[var(--sea-ink)]">
-        <FolderOpen className="size-4 text-[var(--palm)]" /> Picked projects
+      <h2 className="mt-10 flex items-center gap-2 text-sm font-semibold text-(--sea-ink)">
+        <FolderOpen className="size-4 text-(--palm)" /> Picked projects
       </h2>
       {picked.isPending ? (
-        <p className="mt-3 text-sm text-[var(--sea-ink-soft)]">Loading…</p>
+        <p className="mt-3 text-sm text-(--sea-ink-soft)">Loading…</p>
       ) : null}
       {picked.data?.length === 0 ? (
-        <p className="mt-3 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mt-3 text-sm text-(--sea-ink-soft)">
           Nothing picked yet — search above and pick a project.
         </p>
       ) : null}
@@ -177,10 +177,10 @@ function ProjectPicker() {
                 )
               }
             >
-              <span className="block truncate font-medium text-[var(--sea-ink)]">
+              <span className="block truncate font-medium text-(--sea-ink)">
                 {project.pathWithNamespace}
               </span>
-              <span className="mt-0.5 block text-xs text-[var(--sea-ink-soft)]">
+              <span className="mt-0.5 block text-xs text-(--sea-ink-soft)">
                 {project.defaultBranch
                   ? `default: ${project.defaultBranch}`
                   : 'no default branch'}
@@ -189,7 +189,7 @@ function ProjectPicker() {
             <Button
               variant="ghost"
               size="xs"
-              className="text-[var(--sea-ink-soft)]"
+              className="text-(--sea-ink-soft)"
               disabled={unpick.isPending}
               onClick={() =>
                 unpick.mutate(
@@ -300,10 +300,10 @@ function CacheUsage() {
   const clear = useMutation(trpc.repos.clearCaches.mutationOptions())
   return (
     <div className="island-shell mt-6 flex items-center gap-3 rounded-xl px-4 py-3 text-xs">
-      <HardDrive className="size-4 text-[var(--palm)]" />
-      <span className="flex-1 text-[var(--sea-ink-soft)]">
+      <HardDrive className="size-4 text-(--palm)" />
+      <span className="flex-1 text-(--sea-ink-soft)">
         Repository cache:{' '}
-        <strong className="text-[var(--sea-ink)]">
+        <strong className="text-(--sea-ink)">
           {usage.data ? formatBytes(usage.data.totalBytes) : 'calculating…'}
         </strong>
         {usage.data
@@ -355,12 +355,12 @@ function ProjectMrs(props: {
 
   return (
     <div className="mt-8">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--sea-ink)]">
-        <GitMerge className="size-4 text-[var(--palm)]" />
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-(--sea-ink)">
+        <GitMerge className="size-4 text-(--palm)" />
         Open merge requests · {props.path}
       </h2>
       {mrs.isFetching ? (
-        <p className="mt-3 text-sm text-[var(--sea-ink-soft)]">Loading…</p>
+        <p className="mt-3 text-sm text-(--sea-ink-soft)">Loading…</p>
       ) : null}
       {mrs.isError ? (
         <p className="mt-3 text-sm text-destructive">
@@ -370,7 +370,7 @@ function ProjectMrs(props: {
         </p>
       ) : null}
       {mrs.data?.length === 0 ? (
-        <p className="mt-3 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mt-3 text-sm text-(--sea-ink-soft)">
           No open merge requests.
         </p>
       ) : null}
@@ -387,18 +387,18 @@ function ProjectMrs(props: {
               className="island-shell flex items-center gap-3 rounded-xl p-3 hover:-translate-y-px"
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-[var(--sea-ink)]">
+                <span className="block truncate text-sm font-medium text-(--sea-ink)">
                   {mr.title}
                 </span>
-                <span className="mt-0.5 block truncate text-xs text-[var(--sea-ink-soft)]">
+                <span className="mt-0.5 block truncate text-xs text-(--sea-ink-soft)">
                   {mr.sourceBranch} → {mr.targetBranch}
                   {mr.author ? ` · by ${mr.author}` : ''}
                 </span>
               </span>
-              <span className="shrink-0 font-mono text-xs text-[var(--sea-ink-soft)]">
+              <span className="shrink-0 font-mono text-xs text-(--sea-ink-soft)">
                 !{mr.iid}
               </span>
-              <ArrowRight className="size-4 shrink-0 text-[var(--sea-ink-soft)]" />
+              <ArrowRight className="size-4 shrink-0 text-(--sea-ink-soft)" />
             </Link>
           </li>
         ))}

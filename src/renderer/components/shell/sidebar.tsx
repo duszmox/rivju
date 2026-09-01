@@ -19,11 +19,11 @@ import { useTrpc } from '#/lib/trpc.tsx'
 import { useRuns } from '../runs/runs-store.tsx'
 
 const STATUS_STYLES: Record<string, { dot: string; label: string }> = {
-  queued: { dot: 'bg-[var(--sea-ink-soft)]', label: 'text-[var(--sea-ink-soft)]' },
-  running: { dot: 'bg-[var(--lagoon-deep)] animate-pulse', label: 'text-[var(--palm)]' },
-  done: { dot: 'bg-[var(--palm)]', label: 'text-[var(--palm)]' },
+  queued: { dot: 'bg-[var(--sea-ink-soft)]', label: 'text-(--sea-ink-soft)' },
+  running: { dot: 'bg-[var(--lagoon-deep)] animate-pulse', label: 'text-(--palm)' },
+  done: { dot: 'bg-[var(--palm)]', label: 'text-(--palm)' },
   failed: { dot: 'bg-destructive', label: 'text-destructive' },
-  cancelled: { dot: 'bg-[var(--sea-ink-soft)]', label: 'text-[var(--sea-ink-soft)]' },
+  cancelled: { dot: 'bg-[var(--sea-ink-soft)]', label: 'text-(--sea-ink-soft)' },
 }
 
 /** Compact failure line: the specific title plus the recovery action on hover. */
@@ -66,8 +66,8 @@ export function Sidebar() {
       <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-4">
         <RivjuLogo className="size-9 shrink-0 rounded-xl shadow-sm" />
         <div className="min-w-0 flex-1">
-          <p className="font-bold leading-tight text-[var(--sea-ink)]">rivju</p>
-          <p className="text-xs text-[var(--sea-ink-soft)]">
+          <p className="font-bold leading-tight text-(--sea-ink)">rivju</p>
+          <p className="text-xs text-(--sea-ink-soft)">
             run stream {connected ? 'live' : 'connecting…'}
           </p>
         </div>
@@ -83,7 +83,7 @@ export function Sidebar() {
       </div>
 
       {preflight.data?.status === 'ok' && (
-        <div className="border-b border-[var(--line)] px-4 py-3 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
+        <div className="border-b border-[var(--line)] px-4 py-3 text-xs leading-relaxed text-(--sea-ink-soft)">
           <p className="truncate">
             claude: {preflight.data.account?.email ?? 'logged in'}
             {preflight.data.fromCache ? ' (cached)' : ''}
@@ -112,29 +112,29 @@ export function Sidebar() {
       <nav className="space-y-1 border-b border-[var(--line)] px-3 py-3">
         <Link
           to="/"
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--sea-ink-soft)] hover:bg-[var(--link-bg-hover)] hover:text-[var(--sea-ink)]"
-          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-[var(--sea-ink)] font-medium' }}
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--sea-ink-soft) hover:bg-[var(--link-bg-hover)] hover:text-(--sea-ink)"
+          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium' }}
         >
           <GitMerge className="size-4" /> Review queue
         </Link>
         <Link
           to="/instances"
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--sea-ink-soft)] hover:bg-[var(--link-bg-hover)] hover:text-[var(--sea-ink)]"
-          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-[var(--sea-ink)] font-medium' }}
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--sea-ink-soft) hover:bg-[var(--link-bg-hover)] hover:text-(--sea-ink)"
+          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium' }}
         >
           <KeyRound className="size-4" /> GitLab instances
         </Link>
         <Link
           to="/skills"
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--sea-ink-soft)] hover:bg-[var(--link-bg-hover)] hover:text-[var(--sea-ink)]"
-          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-[var(--sea-ink)] font-medium' }}
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--sea-ink-soft) hover:bg-[var(--link-bg-hover)] hover:text-(--sea-ink)"
+          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium' }}
         >
           <Sparkles className="size-4" /> Skills
         </Link>
         <Link
           to="/settings"
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--sea-ink-soft)] hover:bg-[var(--link-bg-hover)] hover:text-[var(--sea-ink)]"
-          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-[var(--sea-ink)] font-medium' }}
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--sea-ink-soft) hover:bg-[var(--link-bg-hover)] hover:text-(--sea-ink)"
+          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium' }}
         >
           <Settings className="size-4" /> Settings
         </Link>
@@ -142,43 +142,46 @@ export function Sidebar() {
 
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {runs.length === 0 ? (
-          <p className="px-1 py-6 text-center text-xs text-[var(--sea-ink-soft)]">
+          <p className="px-1 py-6 text-center text-xs text-(--sea-ink-soft)">
             No runs yet. Start a review from a merge request.
           </p>
         ) : (
           runs.map((run) => {
             const style = STATUS_STYLES[run.status]
-            return (
-              <div
-                key={run.runId}
-                className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 shadow-sm"
-              >
-                <div className="flex items-center justify-between gap-2">
+            const destination =
+              run.instanceId !== null &&
+              run.gitlabProjectId !== null &&
+              run.iid !== null
+                ? {
+                    instanceId: run.instanceId,
+                    gitlabProjectId: String(run.gitlabProjectId),
+                    iid: String(run.iid),
+                  }
+                : null
+            const content = (
+              <>
+                <div className="flex items-center justify-between gap-2 pr-7">
                   <span className="flex items-center gap-2">
                     <span className={`size-2 rounded-full ${style.dot}`} />
-                    <span className="font-mono text-xs text-[var(--sea-ink-soft)]">
+                    <span className="font-mono text-xs text-(--sea-ink-soft)">
                       {run.runId.slice(0, 8)}
                     </span>
                     <span className={`text-xs font-medium ${style.label}`}>{run.status}</span>
                   </span>
-                  {(run.status === 'running' || run.status === 'queued') && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => cancel.mutate({ runId: run.runId })}
-                      title="Cancel run"
-                    >
-                      <Square className="size-3" />
-                    </Button>
-                  )}
                 </div>
 
-                <p className="mt-1 truncate text-xs text-[var(--sea-ink)]">
+                {run.sourceBranch ? (
+                  <p className="mt-1 truncate font-mono text-[10px] text-(--sea-ink-soft)">
+                    {run.sourceBranch}
+                    {run.targetBranch ? ` → ${run.targetBranch}` : ''}
+                  </p>
+                ) : null}
+
+                <p className="mt-1 truncate text-xs text-(--sea-ink)">
                   {run.lastTool ?? run.message ?? (run.status === 'queued' ? `queue position ${run.queuePosition ?? '…'}` : run.phase) ?? 'waiting…'}
                 </p>
 
-                <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-[var(--sea-ink-soft)]">
+                <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-(--sea-ink-soft)">
                   <span>
                     {run.inputTokens.toLocaleString()} in / {run.outputTokens.toLocaleString()} out
                   </span>
@@ -186,20 +189,51 @@ export function Sidebar() {
                 </div>
 
                 {run.status === 'done' && (
-                  <p className="mt-1 text-[10px] text-[var(--palm)]">
+                  <p className="mt-1 text-[10px] text-(--palm)">
                     {run.findingCount ?? 0} findings
                   </p>
                 )}
                 {run.status === 'failed' && run.message ? (
                   <FailureLine raw={run.message} />
                 ) : null}
+              </>
+            )
+            return (
+              <div
+                key={run.runId}
+                className="relative rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
+              >
+                {destination ? (
+                  <Link
+                    to="/mrs/$instanceId/$gitlabProjectId/$iid"
+                    params={destination}
+                    search={{ runId: run.runId }}
+                    className="block rounded-xl p-3 transition-colors hover:bg-[var(--link-bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lagoon-deep)]"
+                    aria-label={`Open review run ${run.runId.slice(0, 8)}`}
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <div className="p-3">{content}</div>
+                )}
+                {(run.status === 'running' || run.status === 'queued') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-2 h-6 w-6 p-0"
+                    onClick={() => cancel.mutate({ runId: run.runId })}
+                    title="Cancel run"
+                  >
+                    <Square className="size-3" />
+                  </Button>
+                )}
               </div>
             )
           })
         )}
       </div>
 
-      <div className="border-t border-[var(--line)] px-4 py-3 text-[10px] text-[var(--sea-ink-soft)]">
+      <div className="border-t border-[var(--line)] px-4 py-3 text-[10px] text-(--sea-ink-soft)">
         Agentic review for GitLab merge requests
       </div>
     </aside>

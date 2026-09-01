@@ -22,6 +22,9 @@
   SQLite transaction.
 - MR run history selection and a two-run finding comparison grouped into added,
   unchanged, and gone based on submitted evidence events.
+- Sidebar run cards show their source and target branches and link to the exact
+  selected run in the merge-request review workspace. The cancel button remains
+  a separate control from the card link.
 - Explicit loading, error, missing-diff, binary-file, no-run, no-file, no-panel-
   finding, and successful-zero-findings states.
 - Phase 4 service tests for persisted triage/audit events and run-scoped finding
@@ -62,6 +65,12 @@
 - `npm run build` — passed
 - `git diff --check` — passed
 - `npm run test:e2e` — not runnable: Electron reported missing X server / `$DISPLAY`
+
+The sidebar run-card follow-up passed `npx tsc --noEmit`, `npm run lint`, its
+15-test review suite, `npm run build`, and `git diff --check`. The full suite had
+114 passing tests and one unrelated macOS realpath assertion in
+`src/main/skills/skills.test.ts`: the expected `/var/...` path resolved to
+`/private/var/...`.
 
 ## Phase 5 notes
 

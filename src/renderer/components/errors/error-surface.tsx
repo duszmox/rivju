@@ -38,13 +38,13 @@ export function ErrorSurface({
             {error.title}
           </p>
           <p
-            className={`${compact ? 'mt-0.5 line-clamp-2' : 'mt-1'} whitespace-pre-wrap break-words text-[var(--sea-ink-soft)]`}
+            className={`${compact ? 'mt-0.5 line-clamp-2' : 'mt-1'} whitespace-pre-wrap break-words text-(--sea-ink-soft)`}
             title={error.message}
           >
             {error.message}
           </p>
           <p
-            className={`${compact ? 'mt-1' : 'mt-2'} flex items-start gap-1.5 text-[var(--sea-ink)]`}
+            className={`${compact ? 'mt-1' : 'mt-2'} flex items-start gap-1.5 text-(--sea-ink)`}
           >
             <Wrench
               className={`mt-0.5 shrink-0 ${compact ? 'size-3' : 'size-3.5'} text-[var(--lagoon-deep)]`}

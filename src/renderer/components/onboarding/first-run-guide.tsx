@@ -56,8 +56,8 @@ export function FirstRunGuide() {
 
   return (
     <div className="island-shell mt-8 rounded-2xl p-8">
-      <p className="font-semibold text-[var(--sea-ink)]">Welcome to rivju</p>
-      <p className="mx-auto mt-2 max-w-lg text-sm text-[var(--sea-ink-soft)]">
+      <p className="font-semibold text-(--sea-ink)">Welcome to rivju</p>
+      <p className="mx-auto mt-2 max-w-lg text-sm text-(--sea-ink-soft)">
         Three quick steps and your first agentic review is running. Your claude
         CLI login was already checked by the startup gate.
       </p>
@@ -134,21 +134,21 @@ function Step({
         className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg ${
           done
             ? 'bg-[var(--palm)] text-white'
-            : 'bg-[var(--foam)] text-[var(--sea-ink-soft)]'
+            : 'bg-[var(--foam)] text-(--sea-ink-soft)'
         }`}
       >
         {done ? <Check className="size-4" /> : icon}
       </span>
       <div className="min-w-0 flex-1">
         <p
-          className={`flex items-center gap-2 text-sm font-semibold text-[var(--sea-ink)]`}
+          className={`flex items-center gap-2 text-sm font-semibold text-(--sea-ink)`}
         >
           {title}
           {!done ? (
-            <CircleDashed className="size-3.5 text-[var(--sea-ink-soft)]" />
+            <CircleDashed className="size-3.5 text-(--sea-ink-soft)" />
           ) : null}
         </p>
-        <p className="mt-0.5 text-xs text-[var(--sea-ink-soft)]">{detail}</p>
+        <p className="mt-0.5 text-xs text-(--sea-ink-soft)">{detail}</p>
       </div>
       {!done && children ? <div className="shrink-0">{children}</div> : null}
     </li>

@@ -75,7 +75,7 @@ export function VerifyPanel(props: {
     >
       <div className="min-w-0">
         <p className="island-kicker">Verification</p>
-        <p className="mt-1 text-sm font-semibold text-[var(--sea-ink)]">
+        <p className="mt-1 text-sm font-semibold text-(--sea-ink)">
           {openCount === 0
             ? 'No open findings — nothing to re-check'
             : `${openCount} open ${openCount === 1 ? 'finding' : 'findings'} to re-check`}
@@ -158,28 +158,28 @@ function MovementLine(props: {
   const movement = props.movement
   if (!movement) {
     return (
-      <p className="mt-0.5 text-xs text-[var(--sea-ink-soft)]">
+      <p className="mt-0.5 text-xs text-(--sea-ink-soft)">
         Checking head position…
       </p>
     )
   }
   if (movement.status === 'no_review') {
     return (
-      <p className="mt-0.5 text-xs text-[var(--sea-ink-soft)]">
+      <p className="mt-0.5 text-xs text-(--sea-ink-soft)">
         No completed review yet.
       </p>
     )
   }
   if (movement.status === 'unknown') {
     return (
-      <p className="mt-0.5 text-xs text-[var(--sea-ink-soft)]">
+      <p className="mt-0.5 text-xs text-(--sea-ink-soft)">
         Head movement unknown: {movement.reason}
       </p>
     )
   }
   if (movement.status === 'current') {
     return (
-      <p className="mt-0.5 text-xs text-[var(--sea-ink-soft)]">
+      <p className="mt-0.5 text-xs text-(--sea-ink-soft)">
         Head is at the reviewed commit
         <span className="ml-1 font-mono">{movement.newHead.slice(0, 8)}</span>
       </p>
@@ -206,9 +206,9 @@ function LifecycleCounts(props: {
 }) {
   const tones: Record<FindingRow['lifecycle'], string> = {
     open: 'text-[var(--lagoon-deep)]',
-    fixed: 'text-[var(--palm)]',
+    fixed: 'text-(--palm)',
     stale: 'text-amber-700',
-    moot: 'text-[var(--sea-ink-soft)]',
+    moot: 'text-(--sea-ink-soft)',
   }
   const order: FindingRow['lifecycle'][] = ['open', 'fixed', 'stale', 'moot']
   return (

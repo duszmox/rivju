@@ -30,8 +30,8 @@ export function RunContextPreview({ projectId }: { projectId: string | null }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="island-kicker">Live preview</p>
-          <h2 className="mt-1 font-semibold text-[var(--sea-ink)]">What the next run will load</h2>
-          <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+          <h2 className="mt-1 font-semibold text-(--sea-ink)">What the next run will load</h2>
+          <p className="mt-1 text-sm text-(--sea-ink-soft)">
             rivju opens a real Claude session with exactly these options and reads back the skills
             it resolved. No model turn runs, so this costs nothing.
           </p>
@@ -48,7 +48,7 @@ export function RunContextPreview({ projectId }: { projectId: string | null }) {
       </div>
 
       {preview.isPending ? (
-        <p className="mt-4 flex items-center gap-2 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mt-4 flex items-center gap-2 text-sm text-(--sea-ink-soft)">
           <LoaderCircle className="size-4 animate-spin" /> Asking the SDK…
         </p>
       ) : null}
@@ -62,15 +62,15 @@ export function RunContextPreview({ projectId }: { projectId: string | null }) {
       {data ? (
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-[var(--line)] p-3">
-            <p className="text-xs font-semibold text-[var(--sea-ink)]">rivju will pass</p>
+            <p className="text-xs font-semibold text-(--sea-ink)">rivju will pass</p>
             <dl className="mt-2 space-y-2 text-xs">
               <div>
-                <dt className="text-[var(--sea-ink-soft)]">
+                <dt className="text-(--sea-ink-soft)">
                   skills[] · {data.requested.skills.length}
                 </dt>
-                <dd className="mt-1 space-y-0.5 font-mono text-[11px] text-[var(--sea-ink)]">
+                <dd className="mt-1 space-y-0.5 font-mono text-[11px] text-(--sea-ink)">
                   {data.requested.skills.length === 0 ? (
-                    <span className="text-[var(--sea-ink-soft)]">
+                    <span className="text-(--sea-ink-soft)">
                       empty — this run loads no skills at all
                     </span>
                   ) : (
@@ -79,8 +79,8 @@ export function RunContextPreview({ projectId }: { projectId: string | null }) {
                 </dd>
               </div>
               <div>
-                <dt className="text-[var(--sea-ink-soft)]">plugins[]</dt>
-                <dd className="mt-1 space-y-0.5 font-mono text-[11px] break-all text-[var(--sea-ink)]">
+                <dt className="text-(--sea-ink-soft)">plugins[]</dt>
+                <dd className="mt-1 space-y-0.5 font-mono text-[11px] break-all text-(--sea-ink)">
                   {data.requested.plugins.map((plugin) => (
                     <div key={plugin.path}>
                       {plugin.name} → {plugin.path}
@@ -89,16 +89,16 @@ export function RunContextPreview({ projectId }: { projectId: string | null }) {
                 </dd>
               </div>
               <div>
-                <dt className="text-[var(--sea-ink-soft)]">settingSources</dt>
-                <dd className="mt-1 font-mono text-[11px] text-[var(--sea-ink)]">
+                <dt className="text-(--sea-ink-soft)">settingSources</dt>
+                <dd className="mt-1 font-mono text-[11px] text-(--sea-ink)">
                   {data.requested.settingSources.length === 0
                     ? '[] — nothing from your ~/.claude'
                     : data.requested.settingSources.join(', ')}
                 </dd>
               </div>
               <div>
-                <dt className="text-[var(--sea-ink-soft)]">model / effort</dt>
-                <dd className="mt-1 font-mono text-[11px] text-[var(--sea-ink)]">
+                <dt className="text-(--sea-ink-soft)">model / effort</dt>
+                <dd className="mt-1 font-mono text-[11px] text-(--sea-ink)">
                   {data.selection.error
                     ? data.selection.error
                     : `${data.selection.modelDisplayName ?? '—'} (${data.selection.modelSource}) · effort ${data.selection.effort ?? 'unset'} (${data.selection.effortSource})`}
@@ -108,7 +108,7 @@ export function RunContextPreview({ projectId }: { projectId: string | null }) {
           </div>
 
           <div className="rounded-xl border border-[var(--line)] p-3">
-            <p className="text-xs font-semibold text-[var(--sea-ink)]">the SDK reports</p>
+            <p className="text-xs font-semibold text-(--sea-ink)">the SDK reports</p>
             {data.probeError ? (
               <p className="mt-2 flex items-start gap-2 text-xs text-destructive">
                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
@@ -116,18 +116,18 @@ export function RunContextPreview({ projectId }: { projectId: string | null }) {
               </p>
             ) : data.probe ? (
               <>
-                <p className="mt-2 text-xs text-[var(--sea-ink-soft)]">
+                <p className="mt-2 text-xs text-(--sea-ink-soft)">
                   {data.probe.includedSkills} of {data.probe.totalSkills} discovered skills loaded ·{' '}
                   {data.probe.tokens.toLocaleString()} tokens of system prompt
                 </p>
-                <ul className="mt-2 space-y-0.5 font-mono text-[11px] text-[var(--sea-ink)]">
+                <ul className="mt-2 space-y-0.5 font-mono text-[11px] text-(--sea-ink)">
                   {data.probe.loaded.length === 0 ? (
-                    <li className="text-[var(--sea-ink-soft)]">nothing loaded</li>
+                    <li className="text-(--sea-ink-soft)">nothing loaded</li>
                   ) : (
                     data.probe.loaded.map((skill) => (
                       <li key={skill.name} className="flex items-center justify-between gap-2">
                         <span className="truncate">{skill.name}</span>
-                        <span className="shrink-0 text-[var(--sea-ink-soft)]">
+                        <span className="shrink-0 text-(--sea-ink-soft)">
                           {skill.source} · {skill.tokens}t
                         </span>
                       </li>
@@ -153,7 +153,7 @@ export function RunContextPreview({ projectId }: { projectId: string | null }) {
               </p>
             ) : null}
             {data.probe && data.missing.length === 0 && data.unexpected.length === 0 ? (
-              <p className="mt-3 flex items-center gap-2 text-xs text-[var(--palm)]">
+              <p className="mt-3 flex items-center gap-2 text-xs text-(--palm)">
                 <CircleCheck className="size-3.5" /> The SDK loaded exactly what rivju asked for.
               </p>
             ) : null}

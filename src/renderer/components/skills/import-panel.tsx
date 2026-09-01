@@ -48,11 +48,11 @@ export function ImportPanel({
 
   return (
     <div className="island-shell rounded-2xl p-5">
-      <p className="flex items-center gap-2 font-semibold text-[var(--sea-ink)]">
-        <PackagePlus className="size-4 text-[var(--palm)]" />
+      <p className="flex items-center gap-2 font-semibold text-(--sea-ink)">
+        <PackagePlus className="size-4 text-(--palm)" />
         Import from a checkout
       </p>
-      <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+      <p className="mt-1 text-sm text-(--sea-ink-soft)">
         Copies <code>.claude/skills/*</code> out of a local checkout into rivju&apos;s{' '}
         {scope === 'user' ? 'user' : 'project'} plugin. Imported skills arrive switched off so they
         never change a review before you have read them.
@@ -83,12 +83,12 @@ export function ImportPanel({
           </Button>
         ) : null}
         {root ? (
-          <span className="truncate font-mono text-[11px] text-[var(--sea-ink-soft)]">{root}</span>
+          <span className="truncate font-mono text-[11px] text-(--sea-ink-soft)">{root}</span>
         ) : null}
       </div>
 
       {scan.isFetching ? (
-        <p className="mt-3 flex items-center gap-2 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mt-3 flex items-center gap-2 text-sm text-(--sea-ink-soft)">
           <LoaderCircle className="size-4 animate-spin" /> Scanning…
         </p>
       ) : null}
@@ -100,13 +100,13 @@ export function ImportPanel({
       ) : null}
 
       {scan.data && !scan.data.exists ? (
-        <p className="mt-3 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mt-3 text-sm text-(--sea-ink-soft)">
           No <code>{scan.data.skillsDir}</code> in that folder.
         </p>
       ) : null}
 
       {scan.data?.exists && scan.data.candidates.length === 0 ? (
-        <p className="mt-3 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mt-3 text-sm text-(--sea-ink-soft)">
           That checkout has a <code>.claude/skills</code> directory but nothing importable in it.
         </p>
       ) : null}
@@ -129,26 +129,26 @@ export function ImportPanel({
                   aria-label={`Import ${candidate.directory}`}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--sea-ink)]">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-(--sea-ink)">
                     {candidate.name ?? candidate.directory}
                     {candidate.symlinked ? (
                       <span
-                        className="flex items-center gap-1 rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--sea-ink-soft)]"
+                        className="flex items-center gap-1 rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-(--sea-ink-soft)"
                         title={`Resolved to ${candidate.realPath}`}
                       >
                         <Link2 className="size-3" /> symlink resolved
                       </span>
                     ) : null}
                     {candidate.conflicts ? (
-                      <span className="rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--sea-ink-soft)]">
+                      <span className="rounded bg-[var(--chip-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-(--sea-ink-soft)">
                         name taken — will import with a suffix
                       </span>
                     ) : null}
                   </p>
-                  <p className="mt-0.5 text-xs text-[var(--sea-ink-soft)]">
+                  <p className="mt-0.5 text-xs text-(--sea-ink-soft)">
                     {candidate.description ?? 'No description in the frontmatter.'}
                   </p>
-                  <p className="mt-1 font-mono text-[10px] break-all text-[var(--sea-ink-soft)]">
+                  <p className="mt-1 font-mono text-[10px] break-all text-(--sea-ink-soft)">
                     {candidate.realPath}
                   </p>
                   {candidate.issues.length > 0 ? (
@@ -195,7 +195,7 @@ export function ImportPanel({
       {runImport.data ? (
         <div className="mt-2 text-xs">
           {runImport.data.imported.map((item) => (
-            <p key={item.name} className="text-[var(--palm)]">
+            <p key={item.name} className="text-(--palm)">
               Imported {item.requested} as <code>{item.name}</code>
               {item.renamed ? ' (renamed to avoid a collision)' : ''}
             </p>
