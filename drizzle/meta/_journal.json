@@ -15,6 +15,13 @@
       "when": 1788269257647,
       "tag": "0001_large_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788273254621,
+      "tag": "0002_even_excalibur",
+      "breakpoints": true
     }
   ]
 }

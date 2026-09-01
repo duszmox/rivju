@@ -171,9 +171,8 @@ export type FindingEventType =
 
 export const findingEvent = sqliteTable('finding_event', {
   id: text('id').primaryKey().$defaultFn(uuid),
-  findingId: text('finding_id')
-    .notNull()
-    .references(() => finding.id, { onDelete: 'cascade' }),
+  /** Null only for verifier rejections, which happen before a valid finding exists. */
+  findingId: text('finding_id').references(() => finding.id, { onDelete: 'cascade' }),
   runId: text('run_id')
     .notNull()
     .references(() => run.id, { onDelete: 'cascade' }),

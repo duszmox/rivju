@@ -1,3 +1,5 @@
+import type { FindingRow } from '../db/schema.ts'
+
 export type RunPhase =
   | 'queued'
   | 'preparing'
@@ -8,6 +10,7 @@ export type RunPhase =
   | 'cancelled'
 
 export type RunEvent =
+  | { type: 'run:queued'; runId: string; at: number; position: number }
   | {
       type: 'run:started'
       runId: string
@@ -26,6 +29,7 @@ export type RunEvent =
       costUsd: number
     }
   | { type: 'run:done'; runId: string; at: number; findingCount: number }
+  | { type: 'run:finding'; runId: string; at: number; finding: FindingRow }
   | { type: 'run:failed'; runId: string; at: number; error: string }
   | { type: 'run:cancelled'; runId: string; at: number }
 

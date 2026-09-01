@@ -4,6 +4,8 @@ import { closeDatabase, openDatabase } from './db/client.ts'
 import { applyMigrations, interruptStaleRuns } from './db/migrate.ts'
 import { ensureDirs, resolvePaths } from './paths.ts'
 import { runRepoGc } from './repo/service.ts'
+import { disposeReviewRuns } from './review/runner.ts'
+import { seedBuiltinSkills } from './review/skills.ts'
 import { disposeFakeRuns } from './runs/fake.ts'
 import { registerTrpcIpc } from './trpc/ipc.ts'
 import type { TrpcContext } from './trpc/context.ts'
@@ -16,6 +18,7 @@ async function bootstrap(): Promise<void> {
   const db = openDatabase(paths.dbFile)
   applyMigrations(db, paths.migrationsDir)
   interruptStaleRuns(db)
+  await seedBuiltinSkills(db, paths.skillsDir)
   await runRepoGc()
     .then(({ removed }) => {
       if (removed > 0) console.log(`[rivju] removed ${removed} orphaned/expired worktree(s)`)
@@ -73,6 +76,7 @@ if (!gotSingleInstanceLock) {
   })
 
   app.on('before-quit', () => {
+    disposeReviewRuns()
     disposeFakeRuns()
     closeDatabase()
   })

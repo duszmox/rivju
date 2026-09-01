@@ -9,8 +9,11 @@ import {
   FilePen,
   GitMerge,
   LoaderCircle,
+  Play,
 } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Button } from '#/components/ui/button.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select.tsx'
 import { useTrpc } from '#/lib/trpc.tsx'
 
 export const Route = createFileRoute('/mrs/$instanceId/$gitlabProjectId/$iid')({
@@ -51,7 +54,7 @@ function MergeRequestDetail() {
     )
   }
 
-  const { mr, description, diffRefs, files } = detail.data
+  const { mr, description, labels, diffRefs, files } = detail.data
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-10">
@@ -123,6 +126,7 @@ function MergeRequestDetail() {
           iid={Number(iid)}
           baseSha={diffRefs.baseSha}
           headSha={diffRefs.headSha}
+          labels={labels}
         />
       ) : null}
 
@@ -177,6 +181,7 @@ function RepositoryPreparation(props: {
   iid: number
   baseSha: string
   headSha: string
+  labels: string[]
 }) {
   const trpc = useTrpc()
   const prepare = useMutation(trpc.repos.prepare.mutationOptions())
@@ -194,6 +199,14 @@ function RepositoryPreparation(props: {
         : 300
     },
   })
+  const preflight = useQuery(trpc.system.preflight.queryOptions(undefined))
+  const start = useMutation(trpc.runs.start.mutationOptions())
+  const [model, setModel] = useState<string>('default')
+  const [effort, setEffort] = useState<string>('default')
+  const selectedModel = useMemo(() => {
+    if (preflight.data?.status !== 'ok') return null
+    return model === 'default' ? preflight.data.models[0] : preflight.data.models.find((item) => item.value === model)
+  }, [model, preflight.data])
 
   useEffect(() => {
     prepare.mutate(props, { onSettled: () => void status.refetch() })
@@ -218,7 +231,7 @@ function RepositoryPreparation(props: {
       ) : (
         <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin text-[var(--lagoon-deep)]" />
       )}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="font-medium text-[var(--sea-ink)]">
           {ready
             ? 'Detached checkout ready'
@@ -235,6 +248,39 @@ function RepositoryPreparation(props: {
               : status.data?.detail
             : (status.data?.detail ?? 'Starting repository preparation…')}
         </p>
+        {ready && preflight.data?.status === 'ok' ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Select value={model} onValueChange={(value) => { setModel(value); setEffort('default') }}>
+              <SelectTrigger size="sm"><SelectValue placeholder="Default model" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default · {preflight.data.models[0]?.displayName}</SelectItem>
+                {preflight.data.models.map((item) => <SelectItem key={item.value} value={item.value}>{item.displayName}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {selectedModel?.supportsEffort ? (
+              <Select value={effort} onValueChange={setEffort}>
+                <SelectTrigger size="sm"><SelectValue placeholder="Default effort" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default effort</SelectItem>
+                  {selectedModel.supportedEffortLevels?.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <Button
+              size="sm"
+              disabled={start.isPending}
+              onClick={() => start.mutate({
+                ...props,
+                model: model === 'default' ? undefined : model,
+                effort: effort === 'default' ? undefined : effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max',
+              })}
+            >
+              {start.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
+              Start review
+            </Button>
+            {start.isError ? <span className="text-xs text-destructive">{start.error.message}</span> : null}
+          </div>
+        ) : null}
       </div>
     </div>
   )

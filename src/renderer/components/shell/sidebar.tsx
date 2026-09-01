@@ -6,6 +6,7 @@ import { useTrpc } from '#/lib/trpc.tsx'
 import { useRuns } from '../runs/runs-store.tsx'
 
 const STATUS_STYLES: Record<string, { dot: string; label: string }> = {
+  queued: { dot: 'bg-[var(--sea-ink-soft)]', label: 'text-[var(--sea-ink-soft)]' },
   running: { dot: 'bg-[var(--lagoon-deep)] animate-pulse', label: 'text-[var(--palm)]' },
   done: { dot: 'bg-[var(--palm)]', label: 'text-[var(--palm)]' },
   failed: { dot: 'bg-destructive', label: 'text-destructive' },
@@ -17,7 +18,7 @@ export function Sidebar() {
   const { runs, connected } = useRuns()
   const preflight = useQuery(trpc.system.preflight.queryOptions(undefined))
   const fakeStart = useMutation(trpc.runs.fakeStart.mutationOptions())
-  const fakeCancel = useMutation(trpc.runs.fakeCancel.mutationOptions())
+  const cancel = useMutation(trpc.runs.cancel.mutationOptions())
 
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--foam)]">
@@ -98,12 +99,12 @@ export function Sidebar() {
                     </span>
                     <span className={`text-xs font-medium ${style.label}`}>{run.status}</span>
                   </span>
-                  {run.status === 'running' && (
+                  {(run.status === 'running' || run.status === 'queued') && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      onClick={() => fakeCancel.mutate({ runId: run.runId })}
+                      onClick={() => cancel.mutate({ runId: run.runId })}
                       title="Cancel run"
                     >
                       <Square className="size-3" />
@@ -112,7 +113,7 @@ export function Sidebar() {
                 </div>
 
                 <p className="mt-1 truncate text-xs text-[var(--sea-ink)]">
-                  {run.lastTool ?? run.message ?? run.phase ?? 'waiting…'}
+                  {run.lastTool ?? run.message ?? (run.status === 'queued' ? `queue position ${run.queuePosition ?? '…'}` : run.phase) ?? 'waiting…'}
                 </p>
 
                 <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-[var(--sea-ink-soft)]">
@@ -137,7 +138,7 @@ export function Sidebar() {
       </div>
 
       <div className="border-t border-[var(--line)] px-4 py-3 text-[10px] text-[var(--sea-ink-soft)]">
-        Phase 1 — GitLab instances, projects, MR listing
+        Phase 3 — review engine
       </div>
     </aside>
   )

@@ -56,6 +56,7 @@ export interface MergeRequestListItem {
 export interface MergeRequestDetail {
   mr: MergeRequestListItem
   description: string | null
+  labels: string[]
   diffRefs: { baseSha: string; headSha: string; startSha: string } | null
   files: {
     newPath: string
@@ -477,6 +478,7 @@ export async function fetchMergeRequestDetail(
   return {
     mr: toListItem(instance, mr),
     description: mr.description ?? null,
+    labels: mr.labels ?? [],
     diffRefs: mr.diff_refs
       ? {
           baseSha: mr.diff_refs.base_sha,

@@ -5,7 +5,7 @@ import { useTrpcClient } from '#/lib/trpc.tsx'
 
 export interface RunSummary {
   runId: string
-  status: 'running' | 'done' | 'failed' | 'cancelled'
+  status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
   phase: string | null
   message: string | null
   lastTool: string | null
@@ -13,6 +13,7 @@ export interface RunSummary {
   outputTokens: number
   costUsd: number
   findingCount: number | null
+  queuePosition: number | null
   startedAt: number
   endedAt: number | null
 }
@@ -22,7 +23,7 @@ type RunsMap = Record<string, RunSummary>
 function emptySummary(runId: string): RunSummary {
   return {
     runId,
-    status: 'running',
+    status: 'queued',
     phase: null,
     message: null,
     lastTool: null,
@@ -30,6 +31,7 @@ function emptySummary(runId: string): RunSummary {
     outputTokens: 0,
     costUsd: 0,
     findingCount: null,
+    queuePosition: null,
     startedAt: Date.now(),
     endedAt: null,
   }
@@ -38,8 +40,10 @@ function emptySummary(runId: string): RunSummary {
 function applyEvent(prev: RunsMap, event: RunEvent): RunsMap {
   const run = prev[event.runId] ?? emptySummary(event.runId)
   switch (event.type) {
+    case 'run:queued':
+      return { ...prev, [event.runId]: { ...run, status: 'queued', queuePosition: event.position } }
     case 'run:started':
-      return { ...prev, [event.runId]: { ...run, startedAt: event.at } }
+      return { ...prev, [event.runId]: { ...run, status: 'running', queuePosition: null, startedAt: event.at } }
     case 'run:phase':
       return { ...prev, [event.runId]: { ...run, phase: event.phase, message: event.message } }
     case 'run:tool':
@@ -59,6 +63,8 @@ function applyEvent(prev: RunsMap, event: RunEvent): RunsMap {
         ...prev,
         [event.runId]: { ...run, status: 'done', findingCount: event.findingCount, endedAt: event.at },
       }
+    case 'run:finding':
+      return { ...prev, [event.runId]: { ...run, findingCount: (run.findingCount ?? 0) + 1 } }
     case 'run:failed':
       return { ...prev, [event.runId]: { ...run, status: 'failed', message: event.error, endedAt: event.at } }
     case 'run:cancelled':
@@ -89,6 +95,27 @@ export function RunsProvider({ children }: { children: ReactNode }) {
         setRuns((prev) => applyEvent(prev, event))
       },
       onError: () => setConnected(false),
+    })
+    void client.runs.list.query().then((rows) => {
+      setRuns((current) => {
+        const hydrated = { ...current }
+        for (const row of rows) {
+          // The subscription is established first. Never overwrite a newer
+          // event-derived summary with this point-in-time database snapshot.
+          if (Object.hasOwn(hydrated, row.id)) continue
+          hydrated[row.id] = {
+            ...emptySummary(row.id),
+            status: row.status === 'interrupted' ? 'failed' : row.status,
+            message: row.error,
+            inputTokens: row.usage?.inputTokens ?? 0,
+            outputTokens: row.usage?.outputTokens ?? 0,
+            costUsd: row.usage?.costUsd ?? 0,
+            startedAt: row.startedAt ? new Date(row.startedAt).getTime() : Date.now(),
+            endedAt: row.endedAt ? new Date(row.endedAt).getTime() : null,
+          }
+        }
+        return hydrated
+      })
     })
     return () => {
       subscription.unsubscribe()
