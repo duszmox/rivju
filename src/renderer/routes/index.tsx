@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { ArrowRight, GitMerge, RefreshCw, TriangleAlert } from 'lucide-react'
+import { ArrowRight, GitMerge, RefreshCw } from 'lucide-react'
 import { Button } from '#/components/ui/button.tsx'
+import { ErrorSurface } from '#/components/errors/error-surface.tsx'
+import { FirstRunGuide } from '#/components/onboarding/first-run-guide.tsx'
 import { useTrpc } from '#/lib/trpc.tsx'
 
 export const Route = createFileRoute('/')({ component: ReviewQueue })
@@ -35,29 +37,11 @@ function ReviewQueue() {
         </Button>
       </div>
 
-      {instances.data?.length === 0 && !queue.isPending ? (
-        <div className="island-shell mt-8 rounded-2xl p-8 text-center">
-          <p className="font-semibold text-[var(--sea-ink)]">No GitLab instance connected</p>
-          <p className="mx-auto mt-2 max-w-md text-sm text-[var(--sea-ink-soft)]">
-            Add a self-hosted GitLab instance with a personal access token
-            (api scope) to see your review queue.
-          </p>
-          <Button asChild className="mt-4">
-            <Link to="/instances">Connect a GitLab instance</Link>
-          </Button>
-        </div>
-      ) : null}
+      <FirstRunGuide />
 
       {queue.data?.instanceErrors.map((error) => (
-        <div
-          key={error.instanceId}
-          className="mt-4 flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"
-        >
-          <TriangleAlert className="mt-0.5 size-4 text-destructive" />
-          <div>
-            <p className="font-medium text-destructive">{error.instanceLabel}</p>
-            <p className="text-[var(--sea-ink-soft)]">{error.message}</p>
-          </div>
+        <div key={error.instanceId} className="mt-4">
+          <ErrorSurface heading={error.instanceLabel} raw={error.message} />
         </div>
       ))}
 

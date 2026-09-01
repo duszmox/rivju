@@ -20,7 +20,7 @@ const findingShape = {
   body: z.string().min(1),
   suggested_fix: z.string().min(1).optional(),
 }
-const findingInputSchema = z.object(findingShape)
+export const findingInputSchema = z.object(findingShape)
 export type FindingInput = z.infer<typeof findingInputSchema>
 
 const finishShape = {

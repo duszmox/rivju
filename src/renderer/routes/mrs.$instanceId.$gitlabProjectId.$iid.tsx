@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select.tsx'
+import { ErrorSurface } from '#/components/errors/error-surface.tsx'
 import { useTrpc } from '#/lib/trpc.tsx'
 import { ReviewWorkspace } from '#/components/review/review-workspace.tsx'
 
@@ -42,12 +43,13 @@ function MergeRequestDetail() {
   }
   if (detail.isError) {
     return (
-      <div className="px-8 py-10">
-        <p className="text-sm text-destructive">
-          {detail.error instanceof Error
-            ? detail.error.message
-            : 'Failed to load merge request'}
-        </p>
+      <div className="mx-auto max-w-3xl px-8 py-10">
+        <ErrorSurface
+          heading="Failed to load merge request"
+          raw={detail.error instanceof Error ? detail.error.message : String(detail.error)}
+          onRetry={() => void detail.refetch()}
+          retrying={detail.isRefetching}
+        />
         <Link to="/" className="mt-4 inline-block text-sm">
           ← Back to review queue
         </Link>

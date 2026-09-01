@@ -51,6 +51,7 @@ import {
 import { Textarea } from '#/components/ui/textarea.tsx'
 import { useRuns } from '#/components/runs/runs-store.tsx'
 import { VerifyPanel } from '#/components/review/verify-panel.tsx'
+import { ErrorSurface } from '#/components/errors/error-surface.tsx'
 import { useTrpc, useTrpcClient } from '#/lib/trpc.tsx'
 import 'react-diff-view/style/index.css'
 
@@ -131,12 +132,9 @@ export function ReviewWorkspace(props: Coordinates & {
     )
   if (review.isError)
     return (
-      <SurfaceState
-        icon={<AlertCircle className="size-5" />}
-        title="Review unavailable"
-        detail={review.error.message}
-        tone="error"
-      />
+      <div className="m-6">
+        <ErrorSurface heading="Review unavailable" raw={review.error.message} />
+      </div>
     )
   if (review.data.runs.length === 0)
     return (
@@ -420,17 +418,29 @@ function RunOutcome({
     )
   if (run.status === 'failed' || run.status === 'interrupted')
     return (
-      <div className="mt-4 rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-        {run.kind === 'verify' ? 'Verification' : 'Review'} {run.status}:{' '}
-        {run.error ?? 'No error detail was recorded.'}
+      <div className="mt-4">
+        <ErrorSurface
+          heading={`${run.kind === 'verify' ? 'Verification' : 'Review'} ${run.status}`}
+          raw={
+            run.error
+            ?? 'The run was interrupted: rivju exited while the run was still in progress.'
+          }
+        />
       </div>
     )
   if (run.kind === 'verify') return null
   if (run.status === 'done' && findingCount === 0)
     return (
-      <div className="mt-4 rounded-xl border border-[var(--chip-line)] bg-[var(--hero-b)] px-4 py-3 text-sm text-[var(--palm)]">
-        <Check className="mr-2 inline size-4" />
-        Review completed successfully. The agent produced zero findings.
+      <div className="mt-4 rounded-xl border border-[var(--chip-line)] bg-[var(--hero-b)] px-4 py-3 text-sm">
+        <p className="font-medium text-[var(--palm)]">
+          <Check className="mr-2 inline size-4" />
+          Review completed with zero findings.
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
+          The agent called finish_review without submitting anything. If that is unexpected, re-run
+          the review with a different model, raise effort, or widen the file scope — the run’s JSONL
+          log under rivju’s data folder shows exactly what it inspected.
+        </p>
       </div>
     )
   return null

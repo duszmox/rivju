@@ -19,6 +19,7 @@ import { spawnReviewProcess } from './process.ts'
 import { composeReviewPrompt, composeVerifyPrompt, REVIEW_SYSTEM_PROMPT, VERIFY_SYSTEM_PROMPT } from './prompt.ts'
 import { collectRejectedFindings } from './rejected.ts'
 import { createVerifyMcp, reanchorOpenFindings } from './verify.ts'
+import { LiveTokenAccumulator, usageFromResult } from './usage.ts'
 import { resolveSkillContext } from '../skills/resolve.ts'
 import { ensureRunPluginDirs } from '../skills/service.ts'
 import { parseEffort, resolveModelSelection } from '../settings/service.ts'
@@ -247,11 +248,20 @@ async function executeReview(item: QueuedReview, activeReview: ActiveReview): Pr
         else await runFullFlow(flow)
       },
     )
+    // The run may have "completed" while its log silently failed — a disk that
+    // filled mid-run must surface, not pass.
+    const logFailure = log.failure()
+    if (logFailure) throw logFailure
   } catch (error) {
     if (isCancelled(item.runId)) return
-    const message = activeReview.timedOut
+    const base = activeReview.timedOut
       ? `${item.kind === 'verify' ? 'Verification' : 'Review'} exceeded its wall-clock timeout`
       : error instanceof Error ? error.message : String(error)
+    const logFailure = log.failure()
+    const message =
+      logFailure && logFailure.message !== base
+        ? `${base}\nAdditionally, the run log could not be written: ${logFailure.message}`
+        : base
     db.update(run).set({ status: 'failed', error: message, endedAt: new Date() }).where(eq(run.id, item.runId)).run()
     emitRunEvent({ type: 'run:failed', runId: item.runId, at: Date.now(), error: message })
   } finally {
@@ -528,7 +538,7 @@ async function consumeSession(
       usage = usageFromResult(message)
       db.update(run).set({ usage }).where(eq(run.id, item.runId)).run()
       emitUsage(item.runId, usage)
-      if (message.is_error) throw new Error('errors' in message ? message.errors.join('; ') : message.result)
+      if (message.is_error) throw resultError(message)
     }
   }
   return usage
@@ -668,46 +678,22 @@ function summarizeToolInput(input: unknown): string {
   return entries.join(' · ')
 }
 
-function usageFromResult(message: Extract<SDKMessage, { type: 'result' }>): RunUsage {
-  return Object.values(message.modelUsage).reduce<RunUsage>((total, item) => ({
-    inputTokens: total.inputTokens + item.inputTokens,
-    outputTokens: total.outputTokens + item.outputTokens,
-    cacheReadInputTokens: (total.cacheReadInputTokens ?? 0) + item.cacheReadInputTokens,
-    cacheCreationInputTokens: (total.cacheCreationInputTokens ?? 0) + item.cacheCreationInputTokens,
-    costUsd: (total.costUsd ?? 0) + item.costUSD,
-  }), { inputTokens: 0, outputTokens: 0, costUsd: 0 })
-}
-
 /**
- * Assistant messages are emitted once per completed content block. Messages
- * from the same model turn share an id and carry progressively newer usage, so
- * retain the largest snapshot for each id instead of counting every block.
+ * Assistant messages are emitted once per completed content block. Usage
+ * accumulation lives in `usage.ts`, shared with the offline JSONL replay.
  */
-export class LiveTokenAccumulator {
-  private readonly messages = new Map<string, { inputTokens: number; outputTokens: number }>()
-  private inputTokens = 0
-  private outputTokens = 0
 
-  update(messageId: string, inputTokens: number, outputTokens: number): {
-    inputTokens: number
-    outputTokens: number
-  } | null {
-    const previous = this.messages.get(messageId) ?? { inputTokens: 0, outputTokens: 0 }
-    const next = {
-      inputTokens: Math.max(previous.inputTokens, finiteTokenCount(inputTokens)),
-      outputTokens: Math.max(previous.outputTokens, finiteTokenCount(outputTokens)),
-    }
-    if (next.inputTokens === previous.inputTokens && next.outputTokens === previous.outputTokens) return null
-
-    this.inputTokens += next.inputTokens - previous.inputTokens
-    this.outputTokens += next.outputTokens - previous.outputTokens
-    this.messages.set(messageId, next)
-    return { inputTokens: this.inputTokens, outputTokens: this.outputTokens }
+/** Maps an error result to a message that names what actually stopped the run. */
+function resultError(message: Extract<SDKMessage, { type: 'result' }>): Error {
+  if (message.subtype === 'error_max_turns') {
+    return new Error(
+      `The agent hit the max-turns cap after ${message.num_turns} turns without calling finish_review`,
+    )
   }
-}
-
-function finiteTokenCount(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
+  if (message.subtype === 'error_max_budget_usd') {
+    return new Error('The agent stopped at the cost budget before calling finish_review')
+  }
+  return new Error('errors' in message ? message.errors.join('; ') : message.result)
 }
 
 function markCancelled(runId: string): void {
@@ -740,10 +726,20 @@ function abortError(): Error {
 
 class JsonlWriter {
   private tail: Promise<void> = Promise.resolve()
+  private firstError: Error | null = null
+
   constructor(private readonly filePath: string) {}
   write(value: unknown): void {
     const line = `${JSON.stringify(value)}\n`
-    this.tail = this.tail.then(() => appendFile(this.filePath, line, 'utf8'))
+    this.tail = this.tail.then(() => appendFile(this.filePath, line, 'utf8')).catch((err: unknown) => {
+      // The JSONL log is the primary debugging artifact; if it cannot be
+      // written (disk full, permissions, …) the run must not pass silently.
+      if (!this.firstError) this.firstError = err instanceof Error ? err : new Error(String(err))
+    })
+  }
+  /** First write failure, if any. */
+  failure(): Error | null {
+    return this.firstError
   }
   async close(): Promise<void> { await this.tail }
 }

@@ -66,6 +66,24 @@ async function bootstrap(): Promise<void> {
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
+
+/**
+ * Hermetic test/dev support: point the whole app at an isolated data
+ * directory. Playwright's Electron launch sets this so a smoke test never
+ * touches the user's real rivju data. Playwright's loader also force-appends
+ * `--password-store=basic`, which disables safeStorage on Linux entirely —
+ * re-append the real keyring backend so token encryption works under test.
+ */
+if (gotSingleInstanceLock) {
+  const isolatedData = process.env.RIVJU_USER_DATA_DIR
+  if (isolatedData) {
+    app.setPath('userData', isolatedData)
+    if (process.platform === 'linux') {
+      app.commandLine.appendSwitch('password-store', 'gnome-libsecret')
+    }
+  }
+}
+
 if (!gotSingleInstanceLock) {
   app.quit()
 } else {

@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { GitMerge, KeyRound, LoaderCircle, Play, Settings, Sparkles, Square } from 'lucide-react'
 import { RivjuLogo } from '#/components/brand/logo.tsx'
 import { Button } from '#/components/ui/button.tsx'
+import { classifyFailure } from '../../../main/errors.ts'
 import { useTrpc } from '#/lib/trpc.tsx'
 import { useRuns } from '../runs/runs-store.tsx'
 
@@ -12,6 +13,16 @@ const STATUS_STYLES: Record<string, { dot: string; label: string }> = {
   done: { dot: 'bg-[var(--palm)]', label: 'text-[var(--palm)]' },
   failed: { dot: 'bg-destructive', label: 'text-destructive' },
   cancelled: { dot: 'bg-[var(--sea-ink-soft)]', label: 'text-[var(--sea-ink-soft)]' },
+}
+
+/** Compact failure line: the specific title plus the recovery action on hover. */
+function FailureLine({ raw }: { raw: string }) {
+  const error = classifyFailure(raw)
+  return (
+    <p className="mt-1 truncate text-[10px] text-destructive" title={`${error.title}\n\n${error.recovery}`}>
+      {error.title}
+    </p>
+  )
 }
 
 export function Sidebar() {
@@ -141,9 +152,9 @@ export function Sidebar() {
                     {run.findingCount ?? 0} findings
                   </p>
                 )}
-                {run.status === 'failed' && (
-                  <p className="mt-1 truncate text-[10px] text-destructive">{run.message}</p>
-                )}
+                {run.status === 'failed' && run.message ? (
+                  <FailureLine raw={run.message} />
+                ) : null}
               </div>
             )
           })
@@ -151,7 +162,7 @@ export function Sidebar() {
       </div>
 
       <div className="border-t border-[var(--line)] px-4 py-3 text-[10px] text-[var(--sea-ink-soft)]">
-        Phase 6 — skills & defaults
+        Agentic review for GitLab merge requests
       </div>
     </aside>
   )

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
+import { ErrorSurface } from '#/components/errors/error-surface.tsx'
 import { useTrpc } from '#/lib/trpc.tsx'
 
 export const Route = createFileRoute('/instances')({ component: Instances })
@@ -106,9 +107,11 @@ function Instances() {
           />
         </div>
         {add.isError ? (
-          <p className="text-sm text-destructive">
-            {add.error instanceof Error ? add.error.message : 'Failed to add instance'}
-          </p>
+          <ErrorSurface
+            heading="Could not add instance"
+            raw={add.error instanceof Error ? add.error.message : String(add.error)}
+            compact
+          />
         ) : null}
         <Button type="submit" disabled={add.isPending || !label || !baseUrl || !token}>
           {add.isPending ? (
@@ -213,14 +216,22 @@ function Instances() {
               <p className="mt-2 text-xs text-[var(--sea-ink-soft)]">Validating new token…</p>
             ) : null}
             {validate.isError && validate.variables.instanceId === instance.id ? (
-              <p className="mt-2 text-xs text-destructive">
-                {validate.error instanceof Error ? validate.error.message : 'Validation failed'}
-              </p>
+              <div className="mt-2">
+                <ErrorSurface
+                  heading="Validation failed"
+                  raw={validate.error instanceof Error ? validate.error.message : String(validate.error)}
+                  compact
+                />
+              </div>
             ) : null}
             {reAuth.isError && reAuth.variables.instanceId === instance.id ? (
-              <p className="mt-2 text-xs text-destructive">
-                {reAuth.error instanceof Error ? reAuth.error.message : 'Re-auth failed'}
-              </p>
+              <div className="mt-2">
+                <ErrorSurface
+                  heading="Re-auth failed"
+                  raw={reAuth.error instanceof Error ? reAuth.error.message : String(reAuth.error)}
+                  compact
+                />
+              </div>
             ) : null}
           </div>
         ))}
