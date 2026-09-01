@@ -1,0 +1,13 @@
+{
+  "id": 118452,
+  "name": "rivju-desktop",
+  "revoked": false,
+  "created_at": "2026-05-02T10:00:00.000Z",
+  "description": "rivju desktop review tool",
+  "scopes": ["api", "read_user"],
+  "user_id": 48213,
+  "last_used_at": "2026-09-01T06:41:10.001Z",
+  "active": true,
+  "expires_at": "2027-05-02T00:00:00.000Z",
+  "token": "SHA256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+}

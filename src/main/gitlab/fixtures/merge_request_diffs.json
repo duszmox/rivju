@@ -1,0 +1,44 @@
+[
+  {
+    "diff": "@@ -12,6 +12,14 @@ export function submitFinding(finding: unknown): void {\n+  if (!anchorsMatch(finding)) {\n+    return rejectFinding(finding, 'anchor does not match file content')\n+  }\n   persistFinding(finding)\n }",
+    "new_path": "src/main/review/verify.ts",
+    "old_path": "src/main/review/verify.ts",
+    "a_mode": null,
+    "b_mode": "100644",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  },
+  {
+    "diff": "+export const ANCHOR_CONTEXT_LINES = 3\n",
+    "new_path": "src/main/review/anchor.ts",
+    "old_path": "/dev/null",
+    "a_mode": null,
+    "b_mode": "100644",
+    "new_file": true,
+    "renamed_file": false,
+    "deleted_file": false
+  },
+  {
+    "diff": "-import { deprecatedHelper } from './old.ts'\n",
+    "new_path": "src/main/review/old.ts",
+    "old_path": "src/main/review/old.ts",
+    "a_mode": "100644",
+    "b_mode": null,
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": true
+  },
+  {
+    "diff": "@@ -1,3 +1,3 @@\n-verifyAnchor(check)\n+verifyAnchorStrict(check)",
+    "new_path": "src/main/review/renamed-core.ts",
+    "old_path": "src/main/review/core.ts",
+    "a_mode": "100644",
+    "b_mode": "100644",
+    "new_file": false,
+    "renamed_file": true,
+    "deleted_file": false,
+    "generated_file": false,
+    "overwritten": { "by": "a newer gitlab" }
+  }
+]

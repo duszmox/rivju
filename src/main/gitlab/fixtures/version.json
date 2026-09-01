@@ -1,0 +1,5 @@
+{
+  "version": "17.11.3-ee",
+  "revision": "b0f3a1c2d4e",
+  "some_new_field": "added in a later release"
+}
