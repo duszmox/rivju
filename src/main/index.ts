@@ -8,7 +8,6 @@ import { ensureDirs, resolvePaths } from './paths.ts'
 import { runRepoGc } from './repo/service.ts'
 import { disposeReviewRuns } from './review/runner.ts'
 import { seedBuiltinSkills } from './skills/seed.ts'
-import { disposeFakeRuns } from './runs/fake.ts'
 import { applyUiTheme, getUiTheme } from './ui-theme.ts'
 import { registerTrpcIpc } from './trpc/ipc.ts'
 import type { TrpcContext } from './trpc/context.ts'
@@ -114,7 +113,6 @@ if (!gotSingleInstanceLock) {
 
   app.on('before-quit', () => {
     disposeReviewRuns()
-    disposeFakeRuns()
     closeDatabase()
   })
 }

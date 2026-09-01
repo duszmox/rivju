@@ -41,7 +41,6 @@ export function Sidebar() {
   const queryClient = useQueryClient()
   const { runs, connected } = useRuns()
   const preflight = useQuery(trpc.system.preflight.queryOptions(undefined))
-  const fakeStart = useMutation(trpc.runs.fakeStart.mutationOptions())
   const cancel = useMutation(trpc.runs.cancel.mutationOptions())
   const theme = useQuery(trpc.settings.uiTheme.queryOptions())
   const setTheme = useMutation(trpc.settings.setUiTheme.mutationOptions())
@@ -89,23 +88,6 @@ export function Sidebar() {
             {preflight.data.fromCache ? ' (cached)' : ''}
           </p>
           <p>{preflight.data.models.length} models available</p>
-        </div>
-      )}
-
-      {import.meta.env.DEV && (
-        <div className="border-b border-[var(--line)] px-4 py-3">
-          <Button
-            className="w-full"
-            onClick={() => fakeStart.mutate()}
-            disabled={fakeStart.isPending}
-          >
-            {fakeStart.isPending ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <Play className="size-4" />
-            )}
-            Start fake run
-          </Button>
         </div>
       )}
 

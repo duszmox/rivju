@@ -2,7 +2,6 @@ import { z } from 'zod'
 import { getPreflightState, runPreflight } from '../claude/preflight.ts'
 import { runEventStream } from '../events/bus.ts'
 import { cancelReview, listRuns, startReview, startVerifyRun } from '../review/runner.ts'
-import { cancelFakeRun, startFakeRun } from '../runs/fake.ts'
 import { createCallerFactory, publicProcedure, router } from './base.ts'
 import { instancesRouter } from './routers/instances.ts'
 import { mergeRequestsRouter } from './routers/mergeRequests.ts'
@@ -30,10 +29,6 @@ export const appRouter = router({
         stream.close()
       }
     }),
-    fakeStart: publicProcedure.mutation(() => startFakeRun()),
-    fakeCancel: publicProcedure
-      .input(z.object({ runId: z.string().min(1) }))
-      .mutation(({ input }) => cancelFakeRun(input.runId)),
     list: publicProcedure.query(() => listRuns()),
     start: publicProcedure
       .input(z.object({
