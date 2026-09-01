@@ -12,6 +12,7 @@ import { processFindingSubmission } from './mcp.ts'
 import { isReadOnlyBash } from './permissions.ts'
 import { spawnReviewProcess } from './process.ts'
 import { verifyFindingLocation } from './verifier.ts'
+import { getReview, updateFindingTriage } from './ui.ts'
 
 const migrationsDir = fileURLToPath(new URL('../../../drizzle', import.meta.url))
 const HEAD = 'a'.repeat(40)
@@ -22,6 +23,7 @@ let root: string
 let worktree: string
 let mrId: string
 let runId: string
+let instanceId: string
 
 beforeAll(() => {
   root = mkdtempSync(path.join(tmpdir(), 'rivju-review-test-'))
@@ -39,7 +41,7 @@ beforeEach(() => {
   db.delete(mergeRequest).run()
   db.delete(project).run()
   db.delete(gitlabInstance).run()
-  const instanceId = db.insert(gitlabInstance).values({
+  instanceId = db.insert(gitlabInstance).values({
     label: 'Test', baseUrl: 'https://gitlab.example.com', tokenCiphertext: 'cipher',
   }).returning({ id: gitlabInstance.id }).get().id
   const projectId = db.insert(project).values({
@@ -153,5 +155,49 @@ describe('read-only execution boundary', () => {
     })
     abort.abort()
     await expect(exited).resolves.toBeLessThan(1000)
+  })
+})
+
+describe('review UI persistence', () => {
+  it('persists triage and records its run-scoped audit event', async () => {
+    const submitted = await processFindingSubmission({
+      db, runId, mergeRequestId: mrId, headSha: HEAD, worktreePath: worktree,
+    }, {
+      scope: 'line', file_path: 'src/example.ts', line: 2,
+      anchor_snippet: 'const second = 2', ctx_before: '', ctx_after: '',
+      category: 'correctness', severity: 'medium', title: 'Triage me', body: 'Review body.',
+    })
+    if (!submitted.accepted) throw new Error('Fixture finding was rejected')
+
+    updateFindingTriage({
+      findingId: submitted.row.id,
+      runId,
+      triage: 'valid',
+      note: 'Confirmed by the reviewer',
+    })
+
+    expect(db.select().from(finding).all()).toMatchObject([
+      { id: submitted.row.id, triage: 'valid', triageNote: 'Confirmed by the reviewer' },
+    ])
+    expect(db.select().from(findingEvent).all().at(-1)).toMatchObject({
+      findingId: submitted.row.id,
+      runId,
+      type: 'triaged',
+      payload: { triage: 'valid', note: 'Confirmed by the reviewer' },
+    })
+  })
+
+  it('returns finding evidence grouped by originating run', async () => {
+    const submitted = await processFindingSubmission({
+      db, runId, mergeRequestId: mrId, headSha: HEAD, worktreePath: worktree,
+    }, {
+      scope: 'global', category: 'conventions', severity: 'info', title: 'Global note',
+      body: 'A repository-level observation.', ctx_before: '', ctx_after: '',
+    })
+    if (!submitted.accepted) throw new Error('Fixture finding was rejected')
+
+    const review = await getReview({ instanceId, gitlabProjectId: 1, iid: 7, runId })
+    expect(review.findingIdsByRun[runId]).toEqual([submitted.row.id])
+    expect(review.findings).toMatchObject([{ id: submitted.row.id, scope: 'global' }])
   })
 })

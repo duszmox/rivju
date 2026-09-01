@@ -336,6 +336,37 @@ a {
   background: color-mix(in oklab, var(--header-bg) 84%, transparent 16%);
 }
 
+.review-workspace {
+  --diff-background-color: transparent;
+  --diff-text-color: var(--sea-ink);
+  --diff-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --diff-gutter-insert-background-color: color-mix(in oklab, #b7f0c2 50%, transparent);
+  --diff-gutter-delete-background-color: color-mix(in oklab, #ffc4c4 50%, transparent);
+  --diff-code-insert-background-color: color-mix(in oklab, #d9f7df 46%, transparent);
+  --diff-code-delete-background-color: color-mix(in oklab, #ffe0e0 46%, transparent);
+}
+
+.review-workspace .diff {
+  font-size: 11px;
+}
+
+.review-workspace .diff-code {
+  min-height: 1.5em;
+  word-break: normal;
+}
+
+.review-workspace .diff-widget-content {
+  padding: 6px 12px 8px;
+  background: color-mix(in oklab, var(--foam) 80%, transparent);
+}
+
+.dark .review-workspace {
+  --diff-gutter-insert-background-color: rgba(46, 125, 78, 0.3);
+  --diff-gutter-delete-background-color: rgba(146, 55, 58, 0.3);
+  --diff-code-insert-background-color: rgba(46, 125, 78, 0.2);
+  --diff-code-delete-background-color: rgba(146, 55, 58, 0.2);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

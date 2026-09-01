@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select.tsx'
 import { useTrpc } from '#/lib/trpc.tsx'
+import { ReviewWorkspace } from '#/components/review/review-workspace.tsx'
 
 export const Route = createFileRoute('/mrs/$instanceId/$gitlabProjectId/$iid')({
   component: MergeRequestDetail,
@@ -57,7 +58,7 @@ function MergeRequestDetail() {
   const { mr, description, labels, diffRefs, files } = detail.data
 
   return (
-    <div className="mx-auto max-w-4xl px-8 py-10">
+    <div className="mx-auto max-w-[1600px] px-8 py-10">
       <Link to="/" className="text-xs text-[var(--sea-ink-soft)]">
         ← Review queue
       </Link>
@@ -171,6 +172,12 @@ function MergeRequestDetail() {
           </li>
         ))}
       </ul>
+
+      <ReviewWorkspace
+        instanceId={instanceId}
+        gitlabProjectId={Number(gitlabProjectId)}
+        iid={Number(iid)}
+      />
     </div>
   )
 }

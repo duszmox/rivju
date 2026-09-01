@@ -81,7 +81,7 @@ export function Sidebar() {
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {runs.length === 0 ? (
           <p className="px-1 py-6 text-center text-xs text-[var(--sea-ink-soft)]">
-            No runs yet. Real reviews arrive in Phase 3.
+            No runs yet. Start a review from a merge request.
           </p>
         ) : (
           runs.map((run) => {
@@ -138,7 +138,7 @@ export function Sidebar() {
       </div>
 
       <div className="border-t border-[var(--line)] px-4 py-3 text-[10px] text-[var(--sea-ink-soft)]">
-        Phase 3 — review engine
+        Phase 4 — review & triage
       </div>
     </aside>
   )

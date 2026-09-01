@@ -8,6 +8,7 @@ import { instancesRouter } from './routers/instances.ts'
 import { mergeRequestsRouter } from './routers/mergeRequests.ts'
 import { projectsRouter } from './routers/projects.ts'
 import { reposRouter } from './routers/repos.ts'
+import { reviewsRouter } from './routers/reviews.ts'
 
 export const appRouter = router({
   system: {
@@ -53,6 +54,7 @@ export const appRouter = router({
   projects: projectsRouter,
   mergeRequests: mergeRequestsRouter,
   repos: reposRouter,
+  reviews: reviewsRouter,
 })
 
 export type AppRouter = typeof appRouter
