@@ -1,7 +1,8 @@
 import { TRPCError } from '@trpc/server'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
+import { z } from 'zod'
 import { getDb } from '../db/client.ts'
 import {
   finding,
@@ -18,6 +19,44 @@ export interface ReviewCoordinates {
   instanceId: string
   gitlabProjectId: number
   iid: number
+}
+
+const verifiedPayloadSchema = z.object({
+  verdict: z.enum(['fixed', 'not_fixed', 'moot']),
+  justification: z.string().default(''),
+  headSha: z.string().optional(),
+})
+
+const reanchoredPayloadSchema = z.object({
+  outcome: z.string(),
+  tier: z.string().optional(),
+  ambiguous: z.boolean().optional(),
+  reason: z.string().optional(),
+  from: z
+    .object({ path: z.string().nullable(), line: z.number().nullable() })
+    .optional(),
+  to: z
+    .object({ path: z.string().nullable(), line: z.number().nullable() })
+    .optional(),
+  headSha: z.string().optional(),
+})
+
+export interface VerificationView {
+  findingId: string
+  verdict: 'fixed' | 'not_fixed' | 'moot'
+  justification: string
+  at: string
+}
+
+export interface ReanchorView {
+  findingId: string
+  outcome: string
+  tier?: string
+  ambiguous?: boolean
+  reason?: string
+  from?: { path: string | null; line: number | null }
+  to?: { path: string | null; line: number | null }
+  at: string
 }
 
 export async function getReview(input: ReviewCoordinates & { runId?: string }) {
@@ -46,20 +85,66 @@ export async function getReview(input: ReviewCoordinates & { runId?: string }) {
     .from(finding)
     .where(eq(finding.mergeRequestId, context.mr.id))
     .all()
-  const submittedEvents = getDb()
-    .select({ findingId: findingEvent.findingId, runId: findingEvent.runId })
-    .from(findingEvent)
-    .where(eq(findingEvent.type, 'submitted'))
-    .all()
-    .filter((event) => runs.some((item) => item.id === event.runId))
+  const runIds = runs.map((item) => item.id)
+  const evidence = runIds.length
+    ? getDb()
+        .select({
+          findingId: findingEvent.findingId,
+          runId: findingEvent.runId,
+          type: findingEvent.type,
+          payload: findingEvent.payload,
+          at: findingEvent.createdAt,
+        })
+        .from(findingEvent)
+        .where(
+          and(
+            inArray(findingEvent.type, ['submitted', 'verified', 'reanchored']),
+            inArray(findingEvent.runId, runIds),
+          ),
+        )
+        .all()
+    : []
   const findingIdsByRun = Object.fromEntries(
     runs.map((item) => [
       item.id,
-      submittedEvents
-        .filter((event) => event.runId === item.id && event.findingId)
-        .map((event) => event.findingId as string),
+      [
+        ...new Set(
+          evidence
+            .filter((event) => event.runId === item.id && event.findingId)
+            .map((event) => event.findingId as string),
+        ),
+      ],
     ]),
   )
+  const verificationByRun: Record<string, VerificationView[]> = {}
+  const reanchorByRun: Record<string, ReanchorView[]> = {}
+  for (const event of evidence) {
+    if (!event.findingId) continue
+    if (event.type === 'verified') {
+      const parsed = verifiedPayloadSchema.safeParse(event.payload)
+      if (!parsed.success) continue
+      ;(verificationByRun[event.runId] ??= []).push({
+        findingId: event.findingId,
+        verdict: parsed.data.verdict,
+        justification: parsed.data.justification,
+        at: event.at.toISOString(),
+      })
+    }
+    if (event.type === 'reanchored') {
+      const parsed = reanchoredPayloadSchema.safeParse(event.payload)
+      if (!parsed.success) continue
+      ;(reanchorByRun[event.runId] ??= []).push({
+        findingId: event.findingId,
+        outcome: parsed.data.outcome,
+        tier: parsed.data.tier,
+        ambiguous: parsed.data.ambiguous,
+        reason: parsed.data.reason,
+        from: parsed.data.from,
+        to: parsed.data.to,
+        at: event.at.toISOString(),
+      })
+    }
+  }
 
   let diff = null
   if (
@@ -81,6 +166,8 @@ export async function getReview(input: ReviewCoordinates & { runId?: string }) {
     runs,
     findings,
     findingIdsByRun,
+    verificationByRun,
+    reanchorByRun,
     diff,
   }
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { getHeadMovement } from '../../review/movement.ts'
 import {
   getExpandedReviewPatch,
   getReview,
@@ -16,6 +17,16 @@ export const reviewsRouter = router({
   detail: publicProcedure
     .input(coordinates.extend({ runId: z.string().uuid().optional() }))
     .query(({ input }) => getReview(input)),
+  movement: publicProcedure
+    .input(coordinates.extend({ headSha: z.string().regex(/^[0-9a-f]{40,64}$/i).nullish() }))
+    .query(({ input }) =>
+      getHeadMovement({
+        instanceId: input.instanceId,
+        gitlabProjectId: input.gitlabProjectId,
+        iid: input.iid,
+        headSha: input.headSha ?? null,
+      }),
+    ),
   expandedDiff: publicProcedure
     .input(
       coordinates.extend({

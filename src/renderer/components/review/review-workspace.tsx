@@ -50,6 +50,7 @@ import {
 } from '#/components/ui/select.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
 import { useRuns } from '#/components/runs/runs-store.tsx'
+import { VerifyPanel } from '#/components/review/verify-panel.tsx'
 import { useTrpc, useTrpcClient } from '#/lib/trpc.tsx'
 import 'react-diff-view/style/index.css'
 
@@ -63,7 +64,10 @@ interface Coordinates {
   iid: number
 }
 
-export function ReviewWorkspace(props: Coordinates) {
+export function ReviewWorkspace(props: Coordinates & {
+  labels: string[]
+  diffRefs: { baseSha: string; headSha: string } | null
+}) {
   const trpc = useTrpc()
   const queryClient = useQueryClient()
   const { runs: liveRuns } = useRuns()
@@ -149,6 +153,8 @@ export function ReviewWorkspace(props: Coordinates) {
       data={review.data}
       runId={runId ?? review.data.selectedRunId ?? review.data.runs[0].id}
       onRunChange={setRunId}
+      labels={props.labels}
+      diffRefs={props.diffRefs}
       onTriage={(finding, state, note = finding.triageNote ?? '') =>
         triage.mutate({
           findingId: finding.id,
@@ -167,6 +173,8 @@ function ReviewSurface(props: {
   data: ReviewDetail
   runId: string
   onRunChange: (runId: string) => void
+  labels: string[]
+  diffRefs: { baseSha: string; headSha: string } | null
   onTriage: (finding: FindingRow, state: TriageState, note?: string) => void
   triageError: string | null
 }) {
@@ -272,7 +280,23 @@ function ReviewSurface(props: {
         />
       </div>
 
+      <VerifyPanel
+        coordinates={props.coordinates}
+        findings={props.data.findings}
+        runs={props.data.runs}
+        labels={props.labels}
+        diffRefs={props.diffRefs}
+      />
+
       <RunOutcome run={run} findingCount={findings.length} />
+      {run.kind === 'verify' ? (
+        <VerificationSummary
+          run={run}
+          findings={props.data.findings}
+          verifications={props.data.verificationByRun[run.id] ?? []}
+          reanchors={props.data.reanchorByRun[run.id] ?? []}
+        />
+      ) : null}
       {props.triageError ? (
         <p className="mt-2 text-xs text-destructive">
           Triage update failed: {props.triageError}
@@ -385,6 +409,23 @@ function RunOutcome({
   run: ReviewRun
   findingCount: number
 }) {
+  if (run.status === 'queued' || run.status === 'running')
+    return (
+      <div className="mt-4 rounded-xl border border-[var(--chip-line)] bg-[var(--hero-a)] px-4 py-3 text-sm text-[var(--lagoon-deep)]">
+        <LoaderCircle className="mr-2 inline size-4 animate-spin" />
+        {run.kind === 'verify'
+          ? `Verification is ${run.status}. Verdicts appear as the agent reports them.`
+          : `Review is ${run.status}. Findings appear as they are accepted.`}
+      </div>
+    )
+  if (run.status === 'failed' || run.status === 'interrupted')
+    return (
+      <div className="mt-4 rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        {run.kind === 'verify' ? 'Verification' : 'Review'} {run.status}:{' '}
+        {run.error ?? 'No error detail was recorded.'}
+      </div>
+    )
+  if (run.kind === 'verify') return null
   if (run.status === 'done' && findingCount === 0)
     return (
       <div className="mt-4 rounded-xl border border-[var(--chip-line)] bg-[var(--hero-b)] px-4 py-3 text-sm text-[var(--palm)]">
@@ -392,20 +433,104 @@ function RunOutcome({
         Review completed successfully. The agent produced zero findings.
       </div>
     )
-  if (run.status === 'failed' || run.status === 'interrupted')
-    return (
-      <div className="mt-4 rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-        Review {run.status}: {run.error ?? 'No error detail was recorded.'}
-      </div>
-    )
-  if (run.status === 'queued' || run.status === 'running')
-    return (
-      <div className="mt-4 rounded-xl border border-[var(--chip-line)] bg-[var(--hero-a)] px-4 py-3 text-sm text-[var(--lagoon-deep)]">
-        <LoaderCircle className="mr-2 inline size-4 animate-spin" />
-        Review is {run.status}. Findings appear as they are accepted.
-      </div>
-    )
   return null
+}
+
+const VERDICT_LABELS: Record<'fixed' | 'not_fixed' | 'moot', string> = {
+  fixed: 'Fixed',
+  not_fixed: 'Not fixed',
+  moot: 'Moot',
+}
+
+function VerificationSummary(props: {
+  run: ReviewRun
+  findings: FindingRow[]
+  verifications: ReviewDetail['verificationByRun'][string]
+  reanchors: ReviewDetail['reanchorByRun'][string]
+}) {
+  const byId = new Map(props.findings.map((item) => [item.id, item]))
+  const counts = { fixed: 0, not_fixed: 0, moot: 0 }
+  for (const verdict of props.verifications) counts[verdict.verdict]++
+  const staled = props.reanchors.filter((item) => item.outcome === 'stale')
+  const reported = new Set(props.verifications.map((item) => item.findingId))
+  const unreported = props.reanchors
+    .filter((item) => item.outcome === 'stale')
+    .filter((item) => !reported.has(item.findingId))
+
+  return (
+    <div className="island-shell mt-4 rounded-2xl p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="mr-auto text-sm font-bold text-[var(--sea-ink)]">
+          Verification results
+        </h3>
+        <span className="rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--palm)]">
+          Fixed {counts.fixed}
+        </span>
+        <span className="rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--lagoon-deep)]">
+          Not fixed {counts.not_fixed}
+        </span>
+        <span className="rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--sea-ink-soft)]">
+          Moot {counts.moot}
+        </span>
+        {staled.length ? (
+          <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+            Stale {staled.length}
+          </span>
+        ) : null}
+      </div>
+      {props.run.status === 'done' &&
+      props.verifications.length === 0 &&
+      props.reanchors.length === 0 ? (
+        <p className="mt-3 text-xs text-[var(--sea-ink-soft)]">
+          The verifier reported no verdicts; every target finding remains open.
+        </p>
+      ) : null}
+      {props.verifications.length ? (
+        <ul className="mt-3 space-y-2">
+          {props.verifications.map((item) => {
+            const finding = byId.get(item.findingId)
+            return (
+              <li
+                key={item.findingId}
+                className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
+              >
+                <p className="flex items-center gap-2 text-xs font-semibold text-[var(--sea-ink)]">
+                  <Chip
+                    value={VERDICT_LABELS[item.verdict]}
+                    tone={
+                      item.verdict === 'fixed'
+                        ? 'text-[var(--palm)]'
+                        : item.verdict === 'moot'
+                          ? 'text-[var(--sea-ink-soft)]'
+                          : 'text-[var(--lagoon-deep)]'
+                    }
+                  />
+                  <span className="min-w-0 truncate">
+                    {finding?.title ?? item.findingId}
+                  </span>
+                </p>
+                <p className="mt-1 text-xs text-[var(--sea-ink-soft)]">
+                  {item.justification}
+                </p>
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+      {unreported.length ? (
+        <ul className="mt-2 space-y-1">
+          {unreported.map((item) => (
+            <li
+              key={item.findingId}
+              className="text-xs text-amber-700"
+            >
+              Anchor vanished for “{byId.get(item.findingId)?.title ?? item.findingId}” — marked stale without an agent verdict.
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  )
 }
 
 function FileList(props: {
@@ -695,6 +820,15 @@ function FindingCard(props: {
           tone={severityTone(props.finding.severity)}
         />
         <Chip value={props.finding.category ?? 'general'} />
+        {props.finding.lifecycle !== 'open' ? (
+          <Chip
+            value={props.finding.lifecycle}
+            tone={lifecycleTone(props.finding.lifecycle)}
+          />
+        ) : null}
+        {props.finding.createdRunId === props.run.id ? (
+          <Chip value="new" tone="text-[var(--lagoon-deep)]" />
+        ) : null}
         <span className="ml-auto font-mono text-[9px] text-[var(--sea-ink-soft)]">
           run {props.run.id.slice(0, 8)}
         </span>
@@ -1108,11 +1242,18 @@ function severityTone(value: string | null): string {
       ? 'text-amber-700'
       : 'text-[var(--palm)]'
 }
+function lifecycleTone(value: FindingRow['lifecycle']): string {
+  return value === 'fixed'
+    ? 'text-[var(--palm)]'
+    : value === 'stale'
+      ? 'text-amber-700'
+      : 'text-[var(--sea-ink-soft)]'
+}
 function runLabel(run: ReviewRun): string {
   const date = run.startedAt
     ? new Date(run.startedAt).toLocaleString()
     : 'Not started'
-  return `${date} · ${run.status} · ${run.id.slice(0, 8)}`
+  return `${run.kind === 'verify' ? 'Verify' : 'Review'} · ${date} · ${run.status} · ${run.id.slice(0, 8)}`
 }
 
 function SurfaceState({

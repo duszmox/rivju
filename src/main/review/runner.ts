@@ -1,12 +1,13 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { EffortLevel, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq, isNotNull } from 'drizzle-orm'
 import { appendFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { getPreflightState } from '../claude/preflight.ts'
 import { getDb } from '../db/client.ts'
 import { gitlabInstance, mergeRequest, project, run, setting, skill } from '../db/schema.ts'
 import { emitRunEvent } from '../events/bus.ts'
+import { getClientForInstance } from '../gitlab/service.ts'
 import { resolvePaths } from '../paths.ts'
 import { computeDiff } from '../repo/diff.ts'
 import { ensureMirror, fetchMergeRequest } from '../repo/mirror.ts'
@@ -15,13 +16,19 @@ import { decryptToken } from '../security/tokens.ts'
 import { createReviewMcp } from './mcp.ts'
 import { canUseReviewTool } from './permissions.ts'
 import { spawnReviewProcess } from './process.ts'
-import { composeReviewPrompt, REVIEW_SYSTEM_PROMPT } from './prompt.ts'
-import type { RunRow, RunUsage } from '../db/schema.ts'
+import { composeReviewPrompt, composeVerifyPrompt, REVIEW_SYSTEM_PROMPT, VERIFY_SYSTEM_PROMPT } from './prompt.ts'
+import { collectRejectedFindings } from './rejected.ts'
+import { createVerifyMcp, reanchorOpenFindings } from './verify.ts'
+import type { RivjuDatabase } from '../db/client.ts'
+import type { RunKind, RunRow, RunUsage } from '../db/schema.ts'
 
 const DEFAULT_CONCURRENCY = 2
 const MAX_CONCURRENCY = 5
 const DEFAULT_MAX_TURNS = 40
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
+const VERIFY_DEFAULT_MAX_TURNS = 15
+const VERIFY_DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
+const MAX_TIMEOUT_MS = 2 * 60 * 60 * 1000
 const EFFORTS = new Set<EffortLevel>(['low', 'medium', 'high', 'xhigh', 'max'])
 
 export type StartReviewInput = {
@@ -36,8 +43,15 @@ export type StartReviewInput = {
   effort?: EffortLevel
 }
 
-type QueuedReview = StartReviewInput & { runId: string }
+export type StartVerifyInput = {
+  instanceId: string
+  gitlabProjectId: number
+  iid: number
+}
+
+type QueuedReview = StartReviewInput & { runId: string; kind: RunKind }
 type ReviewQuery = ReturnType<typeof query>
+type ReviewContext = Awaited<ReturnType<typeof lookupContext>>
 type ActiveReview = {
   abort: AbortController
   session: ReviewQuery | null
@@ -70,7 +84,60 @@ export function startReview(input: StartReviewInput): RunRow {
     enabledSkills,
     logPath,
   }).returning().get()
-  pending.push({ ...input, runId })
+  pending.push({ ...input, runId, kind: 'full' })
+  emitQueuePositions()
+  queueMicrotask(pumpQueue)
+  return row
+}
+
+/**
+ * Queue a `verify` run for a merge request: the cheap agent checks whether the
+ * still-open findings survive at the current head. The reviewed head is the
+ * most recent completed run; the new head is resolved live from GitLab so the
+ * check always sees what a reviewer would see right now.
+ */
+export async function startVerifyRun(input: StartVerifyInput): Promise<RunRow> {
+  if (disposing) throw new Error('rivju is shutting down')
+  const db = getDb()
+  const context = lookupContext(input)
+  const reviewed = latestDoneRunWithHead(context.mr.id)
+  if (!reviewed?.headSha) {
+    throw new Error('Run a full review first — "Check if fixed" compares against a completed review')
+  }
+  const fresh = await getClientForInstance(context.instance).getMergeRequest(
+    input.gitlabProjectId,
+    input.iid,
+  )
+  const headSha = fresh.diff_refs?.head_sha ?? null
+  if (!headSha || !isSha(headSha)) {
+    throw new Error('GitLab did not report a current head SHA for this merge request')
+  }
+  const selection = resolveSelection({}, context.project)
+  const paths = resolvePaths()
+  const runId = crypto.randomUUID()
+  const logPath = path.join(paths.logsDir, `${runId}.jsonl`)
+  const row = db.insert(run).values({
+    id: runId,
+    mergeRequestId: context.mr.id,
+    kind: 'verify',
+    status: 'queued',
+    baseSha: reviewed.headSha,
+    headSha,
+    model: selection.model,
+    effort: selection.effort,
+    enabledSkills: [],
+    logPath,
+  }).returning().get()
+  pending.push({
+    instanceId: input.instanceId,
+    gitlabProjectId: input.gitlabProjectId,
+    iid: input.iid,
+    baseSha: reviewed.headSha,
+    headSha,
+    labels: [],
+    runId,
+    kind: 'verify',
+  })
   emitQueuePositions()
   queueMicrotask(pumpQueue)
   return row
@@ -138,7 +205,9 @@ async function executeReview(item: QueuedReview, activeReview: ActiveReview): Pr
   const row = db.select().from(run).where(eq(run.id, item.runId)).get()
   if (!row || row.status === 'cancelled') return
   db.update(run).set({ status: 'running', startedAt: new Date() }).where(eq(run.id, item.runId)).run()
-  emitRunEvent({ type: 'run:started', runId: item.runId, at: Date.now(), model: row.model, effort: row.effort })
+  emitRunEvent({
+    type: 'run:started', runId: item.runId, at: Date.now(), model: row.model, effort: row.effort,
+  })
   const paths = resolvePaths()
   await mkdir(paths.logsDir, { recursive: true })
   const log = new JsonlWriter(row.logPath ?? path.join(paths.logsDir, `${item.runId}.jsonl`))
@@ -171,139 +240,15 @@ async function executeReview(item: QueuedReview, activeReview: ActiveReview): Pr
       { mirrorPath, worktreesDir: paths.worktreesDir, runId: item.runId, headSha: item.headSha },
       async (worktreePath) => {
         db.update(run).set({ worktreePath }).where(eq(run.id, item.runId)).run()
-        const diff = await computeDiff({
-          mirrorPath,
-          baseSha: item.baseSha,
-          headSha: item.headSha,
-          selectedPaths: item.selectedPaths,
-        })
-        if (diff.status === 'needs_scoping') {
-          throw new Error('This merge request exceeds the review budget. Select a file scope before launching.')
-        }
-
-        const completion = { finished: false }
-        let findingCount = 0
-        const mcp = createReviewMcp({
-          db,
-          runId: item.runId,
-          mergeRequestId: context.mr.id,
-          headSha: item.headSha,
-          worktreePath,
-          onFinding: () => { findingCount++ },
-          onFinished: () => { completion.finished = true },
-        })
-        const preflight = getPreflightState()
-        if (preflight.status !== 'ok') throw new Error('Claude preflight is not ready')
-        const userPlugin = path.join(paths.skillsDir, 'user')
-        const projectPlugin = path.join(
-          paths.skillsDir,
-          'project',
-          context.project.instanceId,
-          ...context.project.pathWithNamespace.split('/'),
-        )
-        const plugins = [{ type: 'local' as const, path: userPlugin, skipMcpDiscovery: true }]
-        if (resolveEnabledSkills(context.project.id).some((name) =>
-          db.select().from(skill).where(eq(skill.name, name)).all().some((entry) => entry.projectId === context.project.id),
-        )) plugins.push({ type: 'local' as const, path: projectPlugin, skipMcpDiscovery: true })
-
-        emitPhase(item.runId, 'reviewing', `Reviewing ${diff.files.length} changed files`)
-        const prompt = composeReviewPrompt({
-          title: context.mr.title,
-          description: context.mr.description,
-          labels: item.labels,
-          baseSha: item.baseSha,
-          headSha: item.headSha,
-          files: diff.files,
-        })
-        log.write({
-          type: 'rivju_run_start',
-          at: Date.now(),
-          runId: item.runId,
-          prompt,
-          config: {
-            baseSha: item.baseSha,
-            headSha: item.headSha,
-            model: row.model,
-            effort: row.effort,
-            enabledSkills: row.enabledSkills ?? [],
-            cwd: worktreePath,
-          },
-        })
-        const session = query({
-          prompt,
-          options: {
-            cwd: worktreePath,
-            pathToClaudeCodeExecutable: preflight.claudePath,
-            settingSources: [],
-            plugins,
-            skills: row.enabledSkills ?? [],
-            mcpServers: { rivju: mcp },
-            strictMcpConfig: true,
-            tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill'],
-            allowedTools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'mcp__rivju__submit_finding', 'mcp__rivju__finish_review'],
-            disallowedTools: ['Write', 'Edit', 'WebFetch'],
-            canUseTool: canUseReviewTool,
-            sandbox: {
-              enabled: true,
-              failIfUnavailable: true,
-              autoAllowBashIfSandboxed: false,
-              allowUnsandboxedCommands: false,
-              network: { allowedDomains: [], strictAllowlist: true },
-            },
-            model: row.model ?? undefined,
-            effort: parseEffort(row.effort),
-            maxTurns: settingNumber('review.max_turns', DEFAULT_MAX_TURNS, 1, 200),
-            abortController: activeReview.abort,
-            includePartialMessages: true,
-            systemPrompt: REVIEW_SYSTEM_PROMPT,
-            spawnClaudeCodeProcess: (options) => spawnReviewProcess(
-              options,
-              activeReview.abort.signal,
-              (data) => { log.write({ type: 'rivju_stderr', data, at: Date.now() }) },
-            ),
-          },
-        })
-        activeReview.session = session
-        const timeoutMs = settingNumber('review.timeout_ms', DEFAULT_TIMEOUT_MS, 10_000, 2 * 60 * 60 * 1000)
-        activeReview.timeout = setTimeout(() => {
-          activeReview.timedOut = true
-          activeReview.abort.abort()
-        }, timeoutMs)
-        let usage: RunUsage = { inputTokens: 0, outputTokens: 0, costUsd: 0 }
-        const liveTokens = new LiveTokenAccumulator()
-        for await (const message of session) {
-          log.write(message)
-          emitToolUse(item.runId, message)
-          if (message.type === 'assistant') {
-            const tokens = liveTokens.update(
-              message.message.id,
-              message.message.usage.input_tokens,
-              message.message.usage.output_tokens,
-            )
-            if (tokens) {
-              usage = { ...usage, ...tokens }
-              db.update(run).set({ usage }).where(eq(run.id, item.runId)).run()
-              emitUsage(item.runId, usage)
-            }
-          }
-          if (message.type === 'result') {
-            usage = usageFromResult(message)
-            db.update(run).set({ usage }).where(eq(run.id, item.runId)).run()
-            emitUsage(item.runId, usage)
-            if (message.is_error) throw new Error('errors' in message ? message.errors.join('; ') : message.result)
-          }
-        }
-        if (!completion.finished) throw new Error('Agent ended without calling finish_review')
-        if (activeReview.abort.signal.aborted) throw abortError()
-        emitPhase(item.runId, 'summarizing', 'Saving review results')
-        db.update(run).set({ status: 'done', usage, endedAt: new Date() }).where(eq(run.id, item.runId)).run()
-        emitRunEvent({ type: 'run:done', runId: item.runId, at: Date.now(), findingCount })
+        const flow = { item, context, row, mirrorPath, worktreePath, activeReview, log }
+        if (item.kind === 'verify') await runVerifyFlow(flow)
+        else await runFullFlow(flow)
       },
     )
   } catch (error) {
     if (isCancelled(item.runId)) return
     const message = activeReview.timedOut
-      ? 'Review exceeded its wall-clock timeout'
+      ? `${item.kind === 'verify' ? 'Verification' : 'Review'} exceeded its wall-clock timeout`
       : error instanceof Error ? error.message : String(error)
     db.update(run).set({ status: 'failed', error: message, endedAt: new Date() }).where(eq(run.id, item.runId)).run()
     emitRunEvent({ type: 'run:failed', runId: item.runId, at: Date.now(), error: message })
@@ -312,6 +257,295 @@ async function executeReview(item: QueuedReview, activeReview: ActiveReview): Pr
     activeReview.session?.close()
     await log.close()
   }
+}
+
+type ReviewFlow = {
+  item: QueuedReview
+  context: ReviewContext
+  row: RunRow
+  /** The mirror resolved for THIS run — context.project.mirrorPath may lag. */
+  mirrorPath: string
+  worktreePath: string
+  activeReview: ActiveReview
+  log: JsonlWriter
+}
+
+async function runFullFlow(flow: ReviewFlow): Promise<void> {
+  const { item, context, row, mirrorPath, worktreePath, activeReview, log } = flow
+  const db = getDb()
+  const diff = await computeDiff({
+    mirrorPath,
+    baseSha: item.baseSha,
+    headSha: item.headSha,
+    selectedPaths: item.selectedPaths,
+  })
+  if (diff.status === 'needs_scoping') {
+    throw new Error('This merge request exceeds the review budget. Select a file scope before launching.')
+  }
+
+  const completion = { finished: false }
+  let findingCount = 0
+  const mcp = createReviewMcp({
+    db,
+    runId: item.runId,
+    mergeRequestId: context.mr.id,
+    headSha: item.headSha,
+    worktreePath,
+    onFinding: () => { findingCount++ },
+    onFinished: () => { completion.finished = true },
+  })
+  const preflight = requirePreflight()
+  const userPlugin = path.join(resolvePaths().skillsDir, 'user')
+  const projectPlugin = path.join(
+    resolvePaths().skillsDir,
+    'project',
+    context.project.instanceId,
+    ...context.project.pathWithNamespace.split('/'),
+  )
+  const plugins = [{ type: 'local' as const, path: userPlugin, skipMcpDiscovery: true }]
+  if (resolveEnabledSkills(context.project.id).some((name) =>
+    db.select().from(skill).where(eq(skill.name, name)).all().some((entry) => entry.projectId === context.project.id),
+  )) plugins.push({ type: 'local' as const, path: projectPlugin, skipMcpDiscovery: true })
+
+  emitPhase(item.runId, 'reviewing', `Reviewing ${diff.files.length} changed files`)
+  const prompt = composeReviewPrompt({
+    title: context.mr.title,
+    description: context.mr.description,
+    labels: item.labels,
+    baseSha: item.baseSha,
+    headSha: item.headSha,
+    files: diff.files,
+    rejected: collectRejectedFindings(db, context.project.id),
+  })
+  log.write({
+    type: 'rivju_run_start',
+    at: Date.now(),
+    runId: item.runId,
+    prompt,
+    config: {
+      kind: 'full',
+      baseSha: item.baseSha,
+      headSha: item.headSha,
+      model: row.model,
+      effort: row.effort,
+      enabledSkills: row.enabledSkills ?? [],
+      cwd: worktreePath,
+    },
+  })
+  const session = query({
+    prompt,
+    options: {
+      cwd: worktreePath,
+      pathToClaudeCodeExecutable: preflight.claudePath,
+      settingSources: [],
+      plugins,
+      skills: row.enabledSkills ?? [],
+      mcpServers: { rivju: mcp },
+      strictMcpConfig: true,
+      tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill'],
+      allowedTools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'mcp__rivju__submit_finding', 'mcp__rivju__finish_review'],
+      disallowedTools: ['Write', 'Edit', 'WebFetch'],
+      canUseTool: canUseReviewTool,
+      sandbox: reviewSandbox(),
+      model: row.model ?? undefined,
+      effort: parseEffort(row.effort),
+      maxTurns: settingNumber('review.max_turns', DEFAULT_MAX_TURNS, 1, 200),
+      abortController: activeReview.abort,
+      includePartialMessages: true,
+      systemPrompt: REVIEW_SYSTEM_PROMPT,
+      spawnClaudeCodeProcess: spawnReviewProcessFactory(activeReview, log),
+    },
+  })
+  activeReview.session = session
+  armTimeout(activeReview, 'review.timeout_ms', DEFAULT_TIMEOUT_MS)
+  const usage = await consumeSession(item, session, db, log)
+  if (!completion.finished) throw new Error('Agent ended without calling finish_review')
+  ensureNotAborted(activeReview)
+  emitPhase(item.runId, 'summarizing', 'Saving review results')
+  completeRun(item.runId, usage, findingCount)
+}
+
+/**
+ * Verify flow: re-anchor the still-open findings at the new head, then hand
+ * only what remains open to a tightly scoped verification agent.
+ */
+async function runVerifyFlow(flow: ReviewFlow): Promise<void> {
+  const { item, context, row, mirrorPath, worktreePath, activeReview, log } = flow
+  const db = getDb()
+  emitPhase(item.runId, 'preparing', 'Re-anchoring open findings at the new head')
+  const reanchor = await reanchorOpenFindings({
+    db,
+    mergeRequestId: context.mr.id,
+    runId: item.runId,
+    headSha: item.headSha,
+    worktreePath,
+    mirrorPath,
+    oldHeadSha: item.baseSha,
+  })
+  log.write({
+    type: 'rivju_reanchor',
+    at: Date.now(),
+    runId: item.runId,
+    checked: reanchor.checked,
+    reanchored: reanchor.reanchored,
+    staled: reanchor.staled,
+    unchanged: reanchor.unchanged,
+  })
+  const targets = reanchor.open
+  if (!targets.length) {
+    emitPhase(item.runId, 'summarizing', 'No open findings remain to verify')
+    completeRun(item.runId, { inputTokens: 0, outputTokens: 0, costUsd: 0 }, 0)
+    return
+  }
+
+  const diff = await computeDiff({
+    mirrorPath,
+    baseSha: item.baseSha,
+    headSha: item.headSha,
+  })
+  if (diff.status === 'needs_scoping') {
+    throw new Error('The changes since the reviewed head exceed the review budget; verify is unavailable for this merge request.')
+  }
+
+  const completion = { finished: false }
+  const mcp = createVerifyMcp({
+    db,
+    runId: item.runId,
+    mergeRequestId: context.mr.id,
+    headSha: item.headSha,
+    targetFindingIds: new Set(targets.map((target) => target.id)),
+    onFinished: () => { completion.finished = true },
+  })
+  const preflight = requirePreflight()
+  const prompt = composeVerifyPrompt({
+    title: context.mr.title,
+    reviewedHeadSha: item.baseSha,
+    headSha: item.headSha,
+    findings: targets,
+    files: diff.files,
+    rejected: collectRejectedFindings(db, context.project.id),
+  })
+  log.write({
+    type: 'rivju_run_start',
+    at: Date.now(),
+    runId: item.runId,
+    prompt,
+    config: {
+      kind: 'verify',
+      baseSha: item.baseSha,
+      headSha: item.headSha,
+      model: row.model,
+      effort: row.effort,
+      enabledSkills: [],
+      openFindings: targets.length,
+      cwd: worktreePath,
+    },
+  })
+  emitPhase(item.runId, 'reviewing', `Verifying ${targets.length} open findings`)
+  const session = query({
+    prompt,
+    options: {
+      cwd: worktreePath,
+      pathToClaudeCodeExecutable: preflight.claudePath,
+      settingSources: [],
+      mcpServers: { rivju: mcp },
+      strictMcpConfig: true,
+      tools: ['Read', 'Grep', 'Glob', 'Bash'],
+      allowedTools: ['Read', 'Grep', 'Glob', 'Bash', 'mcp__rivju__report_verification', 'mcp__rivju__finish_review'],
+      disallowedTools: ['Write', 'Edit', 'WebFetch'],
+      canUseTool: canUseReviewTool,
+      sandbox: reviewSandbox(),
+      model: row.model ?? undefined,
+      effort: parseEffort(row.effort),
+      maxTurns: settingNumber('verify.max_turns', VERIFY_DEFAULT_MAX_TURNS, 1, 200),
+      abortController: activeReview.abort,
+      includePartialMessages: true,
+      systemPrompt: VERIFY_SYSTEM_PROMPT,
+      spawnClaudeCodeProcess: spawnReviewProcessFactory(activeReview, log),
+    },
+  })
+  activeReview.session = session
+  armTimeout(activeReview, 'verify.timeout_ms', VERIFY_DEFAULT_TIMEOUT_MS)
+  const usage = await consumeSession(item, session, db, log)
+  if (!completion.finished) throw new Error('Verification agent ended without calling finish_review')
+  ensureNotAborted(activeReview)
+  emitPhase(item.runId, 'summarizing', 'Saving verification results')
+  completeRun(item.runId, usage, targets.length)
+}
+
+function requirePreflight() {
+  const preflight = getPreflightState()
+  if (preflight.status !== 'ok') throw new Error('Claude preflight is not ready')
+  return preflight
+}
+
+function reviewSandbox() {
+  return {
+    enabled: true,
+    failIfUnavailable: true,
+    autoAllowBashIfSandboxed: false,
+    allowUnsandboxedCommands: false,
+    network: { allowedDomains: [], strictAllowlist: true },
+  }
+}
+
+function spawnReviewProcessFactory(activeReview: ActiveReview, log: JsonlWriter) {
+  return (options: Parameters<typeof spawnReviewProcess>[0]) => spawnReviewProcess(
+    options,
+    activeReview.abort.signal,
+    (data) => { log.write({ type: 'rivju_stderr', data, at: Date.now() }) },
+  )
+}
+
+/** Stream the SDK session to the run log + live events; returns final usage. */
+async function consumeSession(
+  item: { runId: string },
+  session: ReviewQuery,
+  db: RivjuDatabase,
+  log: JsonlWriter,
+): Promise<RunUsage> {
+  let usage: RunUsage = { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+  const liveTokens = new LiveTokenAccumulator()
+  for await (const message of session) {
+    log.write(message)
+    emitToolUse(item.runId, message)
+    if (message.type === 'assistant') {
+      const tokens = liveTokens.update(
+        message.message.id,
+        message.message.usage.input_tokens,
+        message.message.usage.output_tokens,
+      )
+      if (tokens) {
+        usage = { ...usage, ...tokens }
+        db.update(run).set({ usage }).where(eq(run.id, item.runId)).run()
+        emitUsage(item.runId, usage)
+      }
+    }
+    if (message.type === 'result') {
+      usage = usageFromResult(message)
+      db.update(run).set({ usage }).where(eq(run.id, item.runId)).run()
+      emitUsage(item.runId, usage)
+      if (message.is_error) throw new Error('errors' in message ? message.errors.join('; ') : message.result)
+    }
+  }
+  return usage
+}
+
+function armTimeout(activeReview: ActiveReview, settingKey: string, fallback: number): void {
+  const timeoutMs = settingNumber(settingKey, fallback, 10_000, MAX_TIMEOUT_MS)
+  activeReview.timeout = setTimeout(() => {
+    activeReview.timedOut = true
+    activeReview.abort.abort()
+  }, timeoutMs)
+}
+
+function ensureNotAborted(activeReview: ActiveReview): void {
+  if (activeReview.abort.signal.aborted) throw abortError()
+}
+
+function completeRun(runId: string, usage: RunUsage, findingCount: number): void {
+  getDb().update(run).set({ status: 'done', usage, endedAt: new Date() }).where(eq(run.id, runId)).run()
+  emitRunEvent({ type: 'run:done', runId, at: Date.now(), findingCount })
 }
 
 function lookupContext(input: Pick<StartReviewInput, 'instanceId' | 'gitlabProjectId' | 'iid'>) {
@@ -328,7 +562,21 @@ function lookupContext(input: Pick<StartReviewInput, 'instanceId' | 'gitlabProje
   return result
 }
 
-function resolveSelection(input: StartReviewInput, projectRow: typeof project.$inferSelect) {
+function latestDoneRunWithHead(mergeRequestId: string): RunRow | undefined {
+  return getDb().select().from(run)
+    .where(and(
+      eq(run.mergeRequestId, mergeRequestId),
+      eq(run.status, 'done'),
+      isNotNull(run.headSha),
+    ))
+    .orderBy(desc(run.startedAt))
+    .all()[0]
+}
+
+function resolveSelection(
+  input: Pick<StartReviewInput, 'model' | 'effort'>,
+  projectRow: typeof project.$inferSelect,
+) {
   const preflight = getPreflightState()
   if (preflight.status !== 'ok') throw new Error('Claude preflight must succeed before launching a review')
   const globalModel = settingValue('review.default_model')
@@ -374,6 +622,10 @@ function concurrencyLimit(): number {
 
 function parseEffort(value: string | null | undefined): EffortLevel | undefined {
   return value && EFFORTS.has(value as EffortLevel) ? value as EffortLevel : undefined
+}
+
+function isSha(value: string): boolean {
+  return /^[0-9a-f]{40,64}$/i.test(value)
 }
 
 function emitQueuePositions(): void {

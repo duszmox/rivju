@@ -177,6 +177,8 @@ function MergeRequestDetail() {
         instanceId={instanceId}
         gitlabProjectId={Number(gitlabProjectId)}
         iid={Number(iid)}
+        labels={labels}
+        diffRefs={diffRefs}
       />
     </div>
   )
