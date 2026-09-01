@@ -53,6 +53,7 @@ import { useRuns } from '#/components/runs/runs-store.tsx'
 import { VerifyPanel } from '#/components/review/verify-panel.tsx'
 import { ErrorSurface } from '#/components/errors/error-surface.tsx'
 import { useTrpc, useTrpcClient } from '#/lib/trpc.tsx'
+import { useIsDark } from '#/lib/theme.ts'
 import 'react-diff-view/style/index.css'
 
 type ReviewDetail = inferRouterOutputs<AppRouter>['reviews']['detail']
@@ -1100,17 +1101,19 @@ function useShikiTokens(
   filePath: string,
 ): HunkTokens | null {
   const [tokens, setTokens] = useState<HunkTokens | null>(null)
+  const isDark = useIsDark()
   useEffect(() => {
     let cancelled = false
     const lines = sideLines(hunks)
+    const theme = isDark ? 'github-dark' : 'github-light'
     Promise.all([
       codeToTokens(lines.old.join('\n'), {
         lang: languageForPath(filePath),
-        theme: 'github-light',
+        theme,
       }),
       codeToTokens(lines.new.join('\n'), {
         lang: languageForPath(filePath),
-        theme: 'github-light',
+        theme,
       }),
     ])
       .then(([oldResult, newResult]) => {
@@ -1126,7 +1129,7 @@ function useShikiTokens(
     return () => {
       cancelled = true
     }
-  }, [hunks, filePath])
+  }, [hunks, filePath, isDark])
   return tokens
 }
 

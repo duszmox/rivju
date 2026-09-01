@@ -9,6 +9,7 @@ import { runRepoGc } from './repo/service.ts'
 import { disposeReviewRuns } from './review/runner.ts'
 import { seedBuiltinSkills } from './skills/seed.ts'
 import { disposeFakeRuns } from './runs/fake.ts'
+import { applyUiTheme, getUiTheme } from './ui-theme.ts'
 import { registerTrpcIpc } from './trpc/ipc.ts'
 import type { TrpcContext } from './trpc/context.ts'
 import { createMainWindow } from './window.ts'
@@ -42,6 +43,9 @@ async function bootstrap(): Promise<void> {
 
   const context: TrpcContext = { db }
   registerTrpcIpc(context)
+
+  // Before the window exists so first paint uses the persisted appearance.
+  applyUiTheme(getUiTheme())
 
   loadCachedPreflight()
   void runPreflight()

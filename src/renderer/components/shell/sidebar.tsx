@@ -1,6 +1,17 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { GitMerge, KeyRound, LoaderCircle, Play, Settings, Sparkles, Square } from 'lucide-react'
+import {
+  GitMerge,
+  KeyRound,
+  LoaderCircle,
+  Monitor,
+  Moon,
+  Play,
+  Settings,
+  Sparkles,
+  Square,
+  Sun,
+} from 'lucide-react'
 import { RivjuLogo } from '#/components/brand/logo.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { classifyFailure } from '../../../main/errors.ts'
@@ -27,21 +38,48 @@ function FailureLine({ raw }: { raw: string }) {
 
 export function Sidebar() {
   const trpc = useTrpc()
+  const queryClient = useQueryClient()
   const { runs, connected } = useRuns()
   const preflight = useQuery(trpc.system.preflight.queryOptions(undefined))
   const fakeStart = useMutation(trpc.runs.fakeStart.mutationOptions())
   const cancel = useMutation(trpc.runs.cancel.mutationOptions())
+  const theme = useQuery(trpc.settings.uiTheme.queryOptions())
+  const setTheme = useMutation(trpc.settings.setUiTheme.mutationOptions())
+
+  // system -> light -> dark -> system
+  const current = theme.data ?? 'system'
+  const next = current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system'
+  const ThemeIcon = current === 'system' ? Monitor : current === 'light' ? Sun : Moon
+
+  const cycleTheme = (): void => {
+    setTheme.mutate(
+      { theme: next },
+      {
+        onSuccess: () =>
+          void queryClient.invalidateQueries({ queryKey: trpc.settings.uiTheme.pathKey() }),
+      },
+    )
+  }
 
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--foam)]">
       <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-4">
         <RivjuLogo className="size-9 shrink-0 rounded-xl shadow-sm" />
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="font-bold leading-tight text-[var(--sea-ink)]">rivju</p>
           <p className="text-xs text-[var(--sea-ink-soft)]">
             run stream {connected ? 'live' : 'connecting…'}
           </p>
         </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={cycleTheme}
+          disabled={setTheme.isPending}
+          title={`Theme: ${current} — switch to ${next}`}
+        >
+          <ThemeIcon className="size-4" />
+        </Button>
       </div>
 
       {preflight.data?.status === 'ok' && (

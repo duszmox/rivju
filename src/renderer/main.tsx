@@ -3,8 +3,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RunsProvider } from '#/components/runs/runs-store.tsx'
 import { TrpcProvider } from '#/lib/trpc.tsx'
+import { initTheme } from '#/lib/theme.ts'
 import { routeTree } from './routeTree.gen.ts'
 import './styles.css'
+
+initTheme()
 
 const router = createRouter({
   routeTree,
