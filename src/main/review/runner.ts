@@ -348,7 +348,17 @@ function settingValue(key: string): string | null {
 }
 
 function settingNumber(key: string, fallback: number, min: number, max: number): number {
-  const parsed = Number(settingValue(key))
+  return parseBoundedSettingNumber(settingValue(key), fallback, min, max)
+}
+
+export function parseBoundedSettingNumber(
+  value: string | null | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (value === null || value === undefined || value.trim() === '') return fallback
+  const parsed = Number(value)
   return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : fallback
 }
 

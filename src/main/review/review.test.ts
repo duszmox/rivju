@@ -11,6 +11,7 @@ import { findingFingerprint, normalizeAnchorSnippet } from './fingerprint.ts'
 import { processFindingSubmission } from './mcp.ts'
 import { isReadOnlyBash } from './permissions.ts'
 import { spawnReviewProcess } from './process.ts'
+import { parseBoundedSettingNumber } from './runner.ts'
 import { verifyFindingLocation } from './verifier.ts'
 import { getReview, updateFindingTriage } from './ui.ts'
 
@@ -155,6 +156,21 @@ describe('read-only execution boundary', () => {
     })
     abort.abort()
     await expect(exited).resolves.toBeLessThan(1000)
+  })
+})
+
+describe('review numeric settings', () => {
+  it('uses the configured default when a setting is absent or blank', () => {
+    expect(parseBoundedSettingNumber(null, 40, 1, 200)).toBe(40)
+    expect(parseBoundedSettingNumber(undefined, 40, 1, 200)).toBe(40)
+    expect(parseBoundedSettingNumber('  ', 40, 1, 200)).toBe(40)
+  })
+
+  it('accepts finite values and clamps them to the configured bounds', () => {
+    expect(parseBoundedSettingNumber('60', 40, 1, 200)).toBe(60)
+    expect(parseBoundedSettingNumber('0', 40, 1, 200)).toBe(1)
+    expect(parseBoundedSettingNumber('500', 40, 1, 200)).toBe(200)
+    expect(parseBoundedSettingNumber('invalid', 40, 1, 200)).toBe(40)
   })
 })
 

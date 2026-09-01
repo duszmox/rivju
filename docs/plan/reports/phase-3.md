@@ -1,5 +1,14 @@
 # Phase 3 report — review engine
 
+## Maintenance note — numeric setting defaults
+
+- Fixed absent or blank numeric settings being coerced to zero before clamping.
+  This had reduced the default `review.max_turns` from 40 to 1 (and also changed
+  the concurrency and timeout defaults). Missing values now preserve their
+  declared defaults, while explicit finite values remain bounded.
+- Added regression coverage for absent, blank, invalid, valid, and out-of-range
+  numeric setting values.
+
 ## Built
 
 - Boot-time seeding of the `rivju-user-skills` local plugin under
