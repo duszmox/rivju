@@ -96,7 +96,7 @@ function ReviewQueue() {
                   ) : null}
                 </span>
                 <span className="mt-0.5 block truncate text-xs text-[var(--sea-ink-soft)]">
-                  {mr.instanceLabel} · {mr.sourceBranch} → {mr.targetBranch}
+                  {mr.projectPath ?? mr.instanceLabel} · {mr.sourceBranch} → {mr.targetBranch}
                   {mr.author ? ` · by ${mr.author}` : ''}
                 </span>
               </span>

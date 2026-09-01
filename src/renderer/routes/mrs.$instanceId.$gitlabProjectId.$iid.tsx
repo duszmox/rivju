@@ -67,7 +67,7 @@ function MergeRequestDetail() {
         <div className="min-w-0">
           <p className="island-kicker flex items-center gap-2">
             <GitMerge className="size-3.5" />
-            {mr.instanceLabel} · !{mr.iid}
+            {mr.projectPath ?? mr.instanceLabel} · !{mr.iid}
           </p>
           <h1 className="display-title mt-1 text-3xl font-bold text-[var(--sea-ink)]">
             {mr.title}

@@ -85,6 +85,14 @@ export const gitlabMergeRequestSchema = z.object({
   assignees: z.array(gitlabUserSchema).nullish(),
   labels: z.array(z.string()).nullish(),
   diff_refs: gitlabDiffRefsSchema.nullish(),
+  /** Present on GitLab 12+; `full` is `namespace/project!iid`. */
+  references: z
+    .object({
+      short: z.string().nullish(),
+      relative: z.string().nullish(),
+      full: z.string().nullish(),
+    })
+    .nullish(),
 })
 
 /** `GET /projects/:id/merge_requests/:iid/diffs` list item (bounded fields). */
