@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { TriangleAlert } from 'lucide-react'
+import { Button } from '#/components/ui/button.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import {
   Select,
@@ -18,6 +19,13 @@ const INHERIT = '__inherit__'
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 type Effort = (typeof EFFORTS)[number]
 type ModelInfo = RouterOutput['settings']['defaults']['models'][number]
+type UiTheme = NonNullable<RouterOutput['settings']['uiTheme']>
+
+const THEME_OPTIONS: Array<{ value: UiTheme; label: string }> = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+]
 
 /**
  * The layered defaults from 00-architecture.md: global -> per-project -> the
@@ -32,6 +40,8 @@ function Settings() {
   const projects = useQuery(trpc.settings.projectDefaults.queryOptions())
   const setDefaults = useMutation(trpc.settings.setDefaults.mutationOptions())
   const setProject = useMutation(trpc.settings.setProjectDefaults.mutationOptions())
+  const theme = useQuery(trpc.settings.uiTheme.queryOptions())
+  const setTheme = useMutation(trpc.settings.setUiTheme.mutationOptions())
 
   const refresh = (): void => {
     void queryClient.invalidateQueries({ queryKey: trpc.settings.defaults.pathKey() })
@@ -71,6 +81,39 @@ function Settings() {
       ) : null}
 
       <section className="island-shell mt-6 rounded-2xl p-6">
+        <h2 className="font-semibold text-[var(--sea-ink)]">Appearance</h2>
+        <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
+          Follow the operating system or pin a fixed theme.
+        </p>
+        <div className="mt-4 inline-flex rounded-lg border border-[var(--line)] p-1">
+          {THEME_OPTIONS.map((option) => {
+            const active = (theme.data ?? 'system') === option.value
+            return (
+              <Button
+                key={option.value}
+                size="sm"
+                variant={active ? 'default' : 'ghost'}
+                disabled={setTheme.isPending}
+                onClick={() =>
+                  setTheme.mutate(
+                    { theme: option.value },
+                    {
+                      onSuccess: () =>
+                        void queryClient.invalidateQueries({
+                          queryKey: trpc.settings.uiTheme.pathKey(),
+                        }),
+                    },
+                  )
+                }
+              >
+                {option.label}
+              </Button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="island-shell mt-8 rounded-2xl p-6">
         <h2 className="font-semibold text-[var(--sea-ink)]">Global default</h2>
         <p className="mt-1 text-sm text-[var(--sea-ink-soft)]">
           Used by every project that has no override of its own.

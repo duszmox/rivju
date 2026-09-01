@@ -18,6 +18,7 @@ import type { ProjectRow } from '../db/schema.ts'
 
 export const DEFAULT_MODEL_KEY = 'review.default_model'
 export const DEFAULT_EFFORT_KEY = 'review.default_effort'
+export const UI_THEME_KEY = 'ui.theme'
 
 export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 

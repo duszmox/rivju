@@ -8,9 +8,11 @@ import {
   setGlobalDefaults,
   setProjectDefaults,
 } from '../../settings/service.ts'
+import { getUiTheme, setUiTheme } from '../../ui-theme.ts'
 import { publicProcedure, router } from '../base.ts'
 
 const effort = z.enum(EFFORT_LEVELS)
+const theme = z.enum(['system', 'light', 'dark'])
 
 export const settingsRouter = router({
   /** Global model/effort defaults plus the live `ModelInfo[]` catalog. */
@@ -46,4 +48,10 @@ export const settingsRouter = router({
         input.projectId ?? findProjectIdByCoordinates(input.instanceId, input.gitlabProjectId),
       ),
     ),
+
+  uiTheme: publicProcedure.query(() => getUiTheme()),
+
+  setUiTheme: publicProcedure
+    .input(z.object({ theme }))
+    .mutation(({ input }) => setUiTheme(input.theme)),
 })

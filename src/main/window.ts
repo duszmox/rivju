@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import path from 'node:path'
 
 export async function createMainWindow(): Promise<BrowserWindow> {
@@ -9,7 +9,8 @@ export async function createMainWindow(): Promise<BrowserWindow> {
     minHeight: 600,
     show: false,
     title: 'rivju',
-    backgroundColor: '#e7f3ec',
+    // Matches the page background of the active theme to avoid a flash.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a1418' : '#e7f3ec',
     webPreferences: {
       // Preload is bundled to out/preload/index.cjs (CommonJS).
       preload: path.join(__dirname, '../preload/index.cjs'),
