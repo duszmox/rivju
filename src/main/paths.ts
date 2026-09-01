@@ -7,6 +7,7 @@ export interface AppPaths {
   dbFile: string
   logsDir: string
   reposDir: string
+  worktreesDir: string
   skillsDir: string
   migrationsDir: string
 }
@@ -25,6 +26,7 @@ export function resolvePaths(): AppPaths {
     dbFile: path.join(userData, 'rivju.db'),
     logsDir: path.join(userData, 'logs'),
     reposDir: path.join(userData, 'repos'),
+    worktreesDir: path.join(userData, 'worktrees'),
     skillsDir: path.join(userData, 'skills'),
     migrationsDir: app.isPackaged
       ? path.join(process.resourcesPath, 'drizzle')
@@ -35,5 +37,6 @@ export function resolvePaths(): AppPaths {
 export function ensureDirs(paths: AppPaths): void {
   mkdirSync(paths.logsDir, { recursive: true })
   mkdirSync(paths.reposDir, { recursive: true })
+  mkdirSync(paths.worktreesDir, { recursive: true })
   mkdirSync(paths.skillsDir, { recursive: true })
 }

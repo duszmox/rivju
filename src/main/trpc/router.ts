@@ -6,6 +6,7 @@ import { createCallerFactory, publicProcedure, router } from './base.ts'
 import { instancesRouter } from './routers/instances.ts'
 import { mergeRequestsRouter } from './routers/mergeRequests.ts'
 import { projectsRouter } from './routers/projects.ts'
+import { reposRouter } from './routers/repos.ts'
 
 export const appRouter = router({
   system: {
@@ -33,6 +34,7 @@ export const appRouter = router({
   instances: instancesRouter,
   projects: projectsRouter,
   mergeRequests: mergeRequestsRouter,
+  repos: reposRouter,
 })
 
 export type AppRouter = typeof appRouter

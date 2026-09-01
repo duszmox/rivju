@@ -33,6 +33,8 @@ export interface ProjectView {
   pathWithNamespace: string
   name: string
   defaultBranch: string | null
+  mirrorPath: string | null
+  referenceClonePath: string | null
 }
 
 export interface MergeRequestListItem {
@@ -254,6 +256,8 @@ function toProjectView(row: ProjectRow): ProjectView {
     pathWithNamespace: row.pathWithNamespace,
     name: row.name,
     defaultBranch: row.defaultBranch,
+    mirrorPath: row.mirrorPath,
+    referenceClonePath: row.referenceClonePath,
   }
 }
 

@@ -3,18 +3,24 @@ import { loadCachedPreflight, runPreflight } from './claude/preflight.ts'
 import { closeDatabase, openDatabase } from './db/client.ts'
 import { applyMigrations, interruptStaleRuns } from './db/migrate.ts'
 import { ensureDirs, resolvePaths } from './paths.ts'
+import { runRepoGc } from './repo/service.ts'
 import { disposeFakeRuns } from './runs/fake.ts'
 import { registerTrpcIpc } from './trpc/ipc.ts'
 import type { TrpcContext } from './trpc/context.ts'
 import { createMainWindow } from './window.ts'
 
-function bootstrap(): void {
+async function bootstrap(): Promise<void> {
   const paths = resolvePaths()
   ensureDirs(paths)
 
   const db = openDatabase(paths.dbFile)
   applyMigrations(db, paths.migrationsDir)
   interruptStaleRuns(db)
+  await runRepoGc()
+    .then(({ removed }) => {
+      if (removed > 0) console.log(`[rivju] removed ${removed} orphaned/expired worktree(s)`)
+    })
+    .catch((err) => console.warn('[rivju] repository cache cleanup failed', err))
 
   const context: TrpcContext = { db }
   registerTrpcIpc(context)
@@ -53,9 +59,9 @@ if (!gotSingleInstanceLock) {
     }
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     try {
-      bootstrap()
+      await bootstrap()
     } catch (err) {
       console.error('[rivju] bootstrap failed', err)
       app.quit()
