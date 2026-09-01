@@ -2,7 +2,6 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   CheckCircle2,
-  ExternalLink,
   FileCode,
   FileMinus,
   FilePlus,
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
+import { Markdown } from '#/components/ui/markdown.tsx'
 import {
   Select,
   SelectContent,
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '#/components/ui/select.tsx'
 import { ErrorSurface } from '#/components/errors/error-surface.tsx'
+import { INHERIT, inheritModelLabel } from '#/lib/model-select.ts'
 import { useTrpc } from '#/lib/trpc.tsx'
 import { ReviewWorkspace } from '#/components/review/review-workspace.tsx'
 
@@ -159,9 +160,11 @@ function MergeRequestDetail() {
           <p className="text-xs font-semibold text-(--sea-ink-soft)">
             Description
           </p>
-          <p className="mt-2 text-sm whitespace-pre-wrap text-(--sea-ink)">
-            {description}
-          </p>
+          <Markdown
+            value={description}
+            baseUrl={mr.webUrl}
+            className="mt-2 text-sm text-(--sea-ink)"
+          />
         </div>
       ) : null}
 
@@ -242,12 +245,12 @@ function RepositoryPreparation(props: {
     }),
   )
   const start = useMutation(trpc.runs.start.mutationOptions())
-  const [model, setModel] = useState<string>('default')
-  const [effort, setEffort] = useState<string>('default')
+  const [model, setModel] = useState<string>(INHERIT)
+  const [effort, setEffort] = useState<string>(INHERIT)
   const selectedModel = useMemo(() => {
     if (preflight.data?.status !== 'ok') return null
     const resolved = effective.data?.model ?? preflight.data.models[0]?.value
-    const wanted = model === 'default' ? resolved : model
+    const wanted = model === INHERIT ? resolved : model
     return preflight.data.models.find(
       (item) => item.value === wanted || item.resolvedModel === wanted,
     )
@@ -299,17 +302,19 @@ function RepositoryPreparation(props: {
               value={model}
               onValueChange={(value) => {
                 setModel(value)
-                setEffort('default')
+                setEffort(INHERIT)
               }}
             >
               <SelectTrigger size="sm">
                 <SelectValue placeholder="Default model" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="default">
-                  Default ·{' '}
-                  {effective.data?.modelDisplayName ??
-                    preflight.data.models[0]?.displayName}
+                <SelectItem value={INHERIT}>
+                  {inheritModelLabel(
+                    effective.data?.modelSource,
+                    effective.data?.modelDisplayName ??
+                      preflight.data.models[0]?.displayName,
+                  )}
                 </SelectItem>
                 {preflight.data.models.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
@@ -324,9 +329,9 @@ function RepositoryPreparation(props: {
                   <SelectValue placeholder="Default effort" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">
+                  <SelectItem value={INHERIT}>
                     Default effort
-                    {model === 'default' && effective.data?.effort
+                    {model === INHERIT && effective.data?.effort
                       ? ` · ${effective.data.effort}`
                       : ''}
                   </SelectItem>
@@ -344,9 +349,9 @@ function RepositoryPreparation(props: {
               onClick={() =>
                 start.mutate({
                   ...props,
-                  model: model === 'default' ? undefined : model,
+                  model: model === INHERIT ? undefined : model,
                   effort:
-                    effort === 'default'
+                    effort === INHERIT
                       ? undefined
                       : (effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max'),
                 })

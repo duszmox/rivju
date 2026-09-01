@@ -132,6 +132,7 @@ export function RunsProvider({ children }: { children: ReactNode }) {
             inputTokens: row.usage?.inputTokens ?? 0,
             outputTokens: row.usage?.outputTokens ?? 0,
             costUsd: row.usage?.costUsd ?? 0,
+            findingCount: row.findingCount,
             startedAt: row.startedAt ? new Date(row.startedAt).getTime() : Date.now(),
             endedAt: row.endedAt ? new Date(row.endedAt).getTime() : null,
             instanceId: row.instanceId,

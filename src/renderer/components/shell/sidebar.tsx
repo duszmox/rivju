@@ -3,10 +3,8 @@ import { Link } from '@tanstack/react-router'
 import {
   GitMerge,
   KeyRound,
-  LoaderCircle,
   Monitor,
   Moon,
-  Play,
   Settings,
   Sparkles,
   Square,
@@ -20,17 +18,26 @@ import { useRuns } from '../runs/runs-store.tsx'
 
 const STATUS_STYLES: Record<string, { dot: string; label: string }> = {
   queued: { dot: 'bg-[var(--sea-ink-soft)]', label: 'text-(--sea-ink-soft)' },
-  running: { dot: 'bg-[var(--lagoon-deep)] animate-pulse', label: 'text-(--palm)' },
+  running: {
+    dot: 'bg-[var(--lagoon-deep)] animate-pulse',
+    label: 'text-(--palm)',
+  },
   done: { dot: 'bg-[var(--palm)]', label: 'text-(--palm)' },
   failed: { dot: 'bg-destructive', label: 'text-destructive' },
-  cancelled: { dot: 'bg-[var(--sea-ink-soft)]', label: 'text-(--sea-ink-soft)' },
+  cancelled: {
+    dot: 'bg-[var(--sea-ink-soft)]',
+    label: 'text-(--sea-ink-soft)',
+  },
 }
 
 /** Compact failure line: the specific title plus the recovery action on hover. */
 function FailureLine({ raw }: { raw: string }) {
   const error = classifyFailure(raw)
   return (
-    <p className="mt-1 truncate text-[10px] text-destructive" title={`${error.title}\n\n${error.recovery}`}>
+    <p
+      className="mt-1 truncate text-[10px] text-destructive"
+      title={`${error.title}\n\n${error.recovery}`}
+    >
       {error.title}
     </p>
   )
@@ -47,15 +54,19 @@ export function Sidebar() {
 
   // system -> light -> dark -> system
   const current = theme.data ?? 'system'
-  const next = current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system'
-  const ThemeIcon = current === 'system' ? Monitor : current === 'light' ? Sun : Moon
+  const next =
+    current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system'
+  const ThemeIcon =
+    current === 'system' ? Monitor : current === 'light' ? Sun : Moon
 
   const cycleTheme = (): void => {
     setTheme.mutate(
       { theme: next },
       {
         onSuccess: () =>
-          void queryClient.invalidateQueries({ queryKey: trpc.settings.uiTheme.pathKey() }),
+          void queryClient.invalidateQueries({
+            queryKey: trpc.settings.uiTheme.pathKey(),
+          }),
       },
     )
   }
@@ -95,28 +106,36 @@ export function Sidebar() {
         <Link
           to="/"
           className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--sea-ink-soft) hover:bg-[var(--link-bg-hover)] hover:text-(--sea-ink)"
-          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium' }}
+          activeProps={{
+            className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium',
+          }}
         >
           <GitMerge className="size-4" /> Review queue
         </Link>
         <Link
           to="/instances"
           className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--sea-ink-soft) hover:bg-[var(--link-bg-hover)] hover:text-(--sea-ink)"
-          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium' }}
+          activeProps={{
+            className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium',
+          }}
         >
           <KeyRound className="size-4" /> GitLab instances
         </Link>
         <Link
           to="/skills"
           className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--sea-ink-soft) hover:bg-[var(--link-bg-hover)] hover:text-(--sea-ink)"
-          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium' }}
+          activeProps={{
+            className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium',
+          }}
         >
           <Sparkles className="size-4" /> Skills
         </Link>
         <Link
           to="/settings"
           className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--sea-ink-soft) hover:bg-[var(--link-bg-hover)] hover:text-(--sea-ink)"
-          activeProps={{ className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium' }}
+          activeProps={{
+            className: 'bg-[var(--link-bg-hover)] text-(--sea-ink) font-medium',
+          }}
         >
           <Settings className="size-4" /> Settings
         </Link>
@@ -140,6 +159,15 @@ export function Sidebar() {
                     iid: String(run.iid),
                   }
                 : null
+            const live = run.status === 'queued' || run.status === 'running'
+            // Runs hydrated from the database after a restart carry no phase or
+            // tool activity, so there is nothing to say about them — only a run
+            // that is still in flight can be "waiting".
+            const description =
+              run.lastTool ??
+              run.message ??
+              (run.status === 'queued' ? `queue position ${run.queuePosition ?? '…'}` : run.phase) ??
+              (live ? 'waiting…' : null)
             const content = (
               <>
                 <div className="flex items-center justify-between gap-2 pr-7">
@@ -148,7 +176,9 @@ export function Sidebar() {
                     <span className="font-mono text-xs text-(--sea-ink-soft)">
                       {run.runId.slice(0, 8)}
                     </span>
-                    <span className={`text-xs font-medium ${style.label}`}>{run.status}</span>
+                    <span className={`text-xs font-medium ${style.label}`}>
+                      {run.status}
+                    </span>
                   </span>
                 </div>
 
@@ -159,13 +189,14 @@ export function Sidebar() {
                   </p>
                 ) : null}
 
-                <p className="mt-1 truncate text-xs text-(--sea-ink)">
-                  {run.lastTool ?? run.message ?? (run.status === 'queued' ? `queue position ${run.queuePosition ?? '…'}` : run.phase) ?? 'waiting…'}
-                </p>
+                {description ? (
+                  <p className="mt-1 truncate text-xs text-(--sea-ink)">{description}</p>
+                ) : null}
 
                 <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-(--sea-ink-soft)">
                   <span>
-                    {run.inputTokens.toLocaleString()} in / {run.outputTokens.toLocaleString()} out
+                    {run.inputTokens.toLocaleString()} in /{' '}
+                    {run.outputTokens.toLocaleString()} out
                   </span>
                   <span>${run.costUsd.toFixed(4)}</span>
                 </div>

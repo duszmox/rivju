@@ -1,11 +1,11 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { EffortLevel, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { and, desc, eq, isNotNull } from 'drizzle-orm'
+import { and, count, desc, eq, isNotNull } from 'drizzle-orm'
 import { appendFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { getPreflightState } from '../claude/preflight.ts'
 import { getDb } from '../db/client.ts'
-import { gitlabInstance, mergeRequest, project, run, setting, skill } from '../db/schema.ts'
+import { findingEvent, gitlabInstance, mergeRequest, project, run, setting, skill } from '../db/schema.ts'
 import { emitRunEvent } from '../events/bus.ts'
 import { getClientForInstance } from '../gitlab/service.ts'
 import { resolvePaths } from '../paths.ts'
@@ -191,6 +191,17 @@ export function disposeReviewRuns(): void {
 }
 
 export function listRuns() {
+  // One 'submitted' event per finding the run reported, so this reproduces the
+  // count the live run:finding/run:done events build up in the renderer.
+  const submitted = new Map(
+    getDb()
+      .select({ runId: findingEvent.runId, total: count() })
+      .from(findingEvent)
+      .where(eq(findingEvent.type, 'submitted'))
+      .groupBy(findingEvent.runId)
+      .all()
+      .map((row) => [row.runId, row.total] as const),
+  )
   return getDb()
     .select({
       run,
@@ -211,6 +222,7 @@ export function listRuns() {
       iid: item.iid,
       sourceBranch: item.sourceBranch,
       targetBranch: item.targetBranch,
+      findingCount: submitted.get(item.run.id) ?? 0,
     }))
     .sort((a, b) =>
       (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),

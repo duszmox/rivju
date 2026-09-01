@@ -10,12 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import { INHERIT } from '#/lib/model-select.ts'
 import { useTrpc } from '#/lib/trpc.tsx'
 import type { RouterOutput } from '#/lib/trpc.tsx'
 
 export const Route = createFileRoute('/settings')({ component: Settings })
 
-const INHERIT = '__inherit__'
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 type Effort = (typeof EFFORTS)[number]
 type ModelInfo = RouterOutput['settings']['defaults']['models'][number]
@@ -122,24 +122,15 @@ function Settings() {
           <div className="space-y-1.5">
             <Label htmlFor="global-model">Model</Label>
             <Select
-              value={globalModel ?? INHERIT}
+              value={globalTarget?.value ?? ''}
               onValueChange={(value) =>
-                setDefaults.mutate(
-                  { model: value === INHERIT ? null : value, effort: null },
-                  { onSuccess: refresh },
-                )
+                setDefaults.mutate({ model: value, effort: null }, { onSuccess: refresh })
               }
             >
               <SelectTrigger id="global-model" size="sm" className="min-w-64">
-                <SelectValue />
+                <SelectValue placeholder="No model catalog" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={INHERIT}>
-                  First model the CLI reports
-                  {defaults.data?.catalogDefault
-                    ? ` · ${findModel(models, defaults.data.catalogDefault)?.displayName ?? defaults.data.catalogDefault}`
-                    : ''}
-                </SelectItem>
                 {models.map((model) => (
                   <SelectItem key={model.value} value={model.value}>
                     {model.displayName}
