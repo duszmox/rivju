@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as InstancesRouteImport } from './routes/instances'
+import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as InstancesInstanceIdRouteImport } from './routes/instances_.$instanceId'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const InstancesRoute = InstancesRouteImport.update({
   id: '/instances',
   path: '/instances',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -51,6 +57,7 @@ const MrsInstanceIdGitlabProjectIdIidRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/instances': typeof InstancesRoute
+  '/projects': typeof ProjectsRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/instances/$instanceId': typeof InstancesInstanceIdRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/instances': typeof InstancesRoute
+  '/projects': typeof ProjectsRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/instances/$instanceId': typeof InstancesInstanceIdRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/instances': typeof InstancesRoute
+  '/projects': typeof ProjectsRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/instances_/$instanceId': typeof InstancesInstanceIdRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/instances'
+    | '/projects'
     | '/settings'
     | '/skills'
     | '/instances/$instanceId'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/instances'
+    | '/projects'
     | '/settings'
     | '/skills'
     | '/instances/$instanceId'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/instances'
+    | '/projects'
     | '/settings'
     | '/skills'
     | '/instances_/$instanceId'
@@ -103,6 +115,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   InstancesRoute: typeof InstancesRoute
+  ProjectsRoute: typeof ProjectsRoute
   SettingsRoute: typeof SettingsRoute
   SkillsRoute: typeof SkillsRoute
   InstancesInstanceIdRoute: typeof InstancesInstanceIdRoute
@@ -123,6 +136,13 @@ declare module '@tanstack/react-router' {
       path: '/instances'
       fullPath: '/instances'
       preLoaderRoute: typeof InstancesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -159,6 +179,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   InstancesRoute: InstancesRoute,
+  ProjectsRoute: ProjectsRoute,
   SettingsRoute: SettingsRoute,
   SkillsRoute: SkillsRoute,
   InstancesInstanceIdRoute: InstancesInstanceIdRoute,

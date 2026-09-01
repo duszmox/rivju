@@ -229,6 +229,53 @@ export function listRuns() {
     )
 }
 
+export interface RecentlyReviewedProject {
+  instanceId: string
+  instanceLabel: string
+  gitlabProjectId: number
+  pathWithNamespace: string
+  name: string
+  lastReviewedAt: Date
+}
+
+/** Picked projects with at least one run, most recently started first. */
+export function listRecentlyReviewedProjects(limit = 5): RecentlyReviewedProject[] {
+  const rows = getDb()
+    .select({
+      projectId: project.id,
+      instanceId: project.instanceId,
+      instanceLabel: gitlabInstance.label,
+      gitlabProjectId: project.gitlabProjectId,
+      pathWithNamespace: project.pathWithNamespace,
+      name: project.name,
+      startedAt: run.startedAt,
+    })
+    .from(run)
+    .innerJoin(mergeRequest, eq(mergeRequest.id, run.mergeRequestId))
+    .innerJoin(project, eq(project.id, mergeRequest.projectId))
+    .innerJoin(gitlabInstance, eq(gitlabInstance.id, project.instanceId))
+    .where(isNotNull(run.startedAt))
+    .orderBy(desc(run.startedAt))
+    .all()
+
+  const seen = new Set<string>()
+  const result: RecentlyReviewedProject[] = []
+  for (const row of rows) {
+    if (seen.has(row.projectId) || !row.startedAt) continue
+    seen.add(row.projectId)
+    result.push({
+      instanceId: row.instanceId,
+      instanceLabel: row.instanceLabel,
+      gitlabProjectId: Number(row.gitlabProjectId),
+      pathWithNamespace: row.pathWithNamespace,
+      name: row.name,
+      lastReviewedAt: row.startedAt,
+    })
+    if (result.length >= limit) break
+  }
+  return result
+}
+
 function pumpQueue(): void {
   if (disposing) return
   const cap = concurrencyLimit()

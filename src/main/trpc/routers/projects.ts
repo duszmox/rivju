@@ -6,6 +6,7 @@ import {
   searchProjects,
   unpickProject,
 } from '../../gitlab/service.ts'
+import { listRecentlyReviewedProjects } from '../../review/runner.ts'
 import { publicProcedure, router } from '../base.ts'
 
 export const projectsRouter = router({
@@ -43,6 +44,11 @@ export const projectsRouter = router({
   unpick: publicProcedure
     .input(z.object({ instanceId: z.string().min(1), projectId: z.string().min(1) }))
     .mutation(({ input }) => unpickProject(input.instanceId, input.projectId)),
+
+  /** Picked projects with at least one run, most recently reviewed first. */
+  recentlyReviewed: publicProcedure
+    .input(z.object({ limit: z.number().int().positive().max(50).optional() }).optional())
+    .query(({ input }) => listRecentlyReviewedProjects(input?.limit)),
 
   /** Secondary browse view: open MRs for one project. */
   mergeRequests: publicProcedure
