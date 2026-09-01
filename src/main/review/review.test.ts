@@ -11,7 +11,7 @@ import { findingFingerprint, normalizeAnchorSnippet } from './fingerprint.ts'
 import { processFindingSubmission } from './mcp.ts'
 import { isReadOnlyBash } from './permissions.ts'
 import { spawnReviewProcess } from './process.ts'
-import { parseBoundedSettingNumber } from './runner.ts'
+import { LiveTokenAccumulator, parseBoundedSettingNumber } from './runner.ts'
 import { verifyFindingLocation } from './verifier.ts'
 import { getReview, updateFindingTriage } from './ui.ts'
 
@@ -171,6 +171,24 @@ describe('review numeric settings', () => {
     expect(parseBoundedSettingNumber('0', 40, 1, 200)).toBe(1)
     expect(parseBoundedSettingNumber('500', 40, 1, 200)).toBe(200)
     expect(parseBoundedSettingNumber('invalid', 40, 1, 200)).toBe(40)
+  })
+})
+
+describe('live review usage', () => {
+  it('aggregates model turns without double-counting repeated content blocks', () => {
+    const tokens = new LiveTokenAccumulator()
+
+    expect(tokens.update('message-1', 1_000, 25)).toEqual({ inputTokens: 1_000, outputTokens: 25 })
+    expect(tokens.update('message-1', 1_000, 80)).toEqual({ inputTokens: 1_000, outputTokens: 80 })
+    expect(tokens.update('message-1', 1_000, 80)).toBeNull()
+    expect(tokens.update('message-2', 1_400, 40)).toEqual({ inputTokens: 2_400, outputTokens: 120 })
+  })
+
+  it('ignores invalid or decreasing token snapshots', () => {
+    const tokens = new LiveTokenAccumulator()
+
+    expect(tokens.update('message-1', 100, 20)).toEqual({ inputTokens: 100, outputTokens: 20 })
+    expect(tokens.update('message-1', Number.NaN, 10)).toBeNull()
   })
 })
 

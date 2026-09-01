@@ -270,20 +270,26 @@ async function executeReview(item: QueuedReview, activeReview: ActiveReview): Pr
           activeReview.abort.abort()
         }, timeoutMs)
         let usage: RunUsage = { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+        const liveTokens = new LiveTokenAccumulator()
         for await (const message of session) {
           log.write(message)
           emitToolUse(item.runId, message)
+          if (message.type === 'assistant') {
+            const tokens = liveTokens.update(
+              message.message.id,
+              message.message.usage.input_tokens,
+              message.message.usage.output_tokens,
+            )
+            if (tokens) {
+              usage = { ...usage, ...tokens }
+              db.update(run).set({ usage }).where(eq(run.id, item.runId)).run()
+              emitUsage(item.runId, usage)
+            }
+          }
           if (message.type === 'result') {
             usage = usageFromResult(message)
             db.update(run).set({ usage }).where(eq(run.id, item.runId)).run()
-            emitRunEvent({
-              type: 'run:usage',
-              runId: item.runId,
-              at: Date.now(),
-              inputTokens: usage.inputTokens,
-              outputTokens: usage.outputTokens,
-              costUsd: usage.costUsd ?? 0,
-            })
+            emitUsage(item.runId, usage)
             if (message.is_error) throw new Error('errors' in message ? message.errors.join('; ') : message.result)
           }
         }
@@ -389,6 +395,17 @@ function emitToolUse(runId: string, message: SDKMessage): void {
   }
 }
 
+function emitUsage(runId: string, usage: RunUsage): void {
+  emitRunEvent({
+    type: 'run:usage',
+    runId,
+    at: Date.now(),
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    costUsd: usage.costUsd ?? 0,
+  })
+}
+
 function summarizeToolInput(input: unknown): string {
   if (!input || typeof input !== 'object') return ''
   const entries = Object.entries(input).slice(0, 2).map(([key, value]) => `${key}=${String(value).slice(0, 80)}`)
@@ -403,6 +420,38 @@ function usageFromResult(message: Extract<SDKMessage, { type: 'result' }>): RunU
     cacheCreationInputTokens: (total.cacheCreationInputTokens ?? 0) + item.cacheCreationInputTokens,
     costUsd: (total.costUsd ?? 0) + item.costUSD,
   }), { inputTokens: 0, outputTokens: 0, costUsd: 0 })
+}
+
+/**
+ * Assistant messages are emitted once per completed content block. Messages
+ * from the same model turn share an id and carry progressively newer usage, so
+ * retain the largest snapshot for each id instead of counting every block.
+ */
+export class LiveTokenAccumulator {
+  private readonly messages = new Map<string, { inputTokens: number; outputTokens: number }>()
+  private inputTokens = 0
+  private outputTokens = 0
+
+  update(messageId: string, inputTokens: number, outputTokens: number): {
+    inputTokens: number
+    outputTokens: number
+  } | null {
+    const previous = this.messages.get(messageId) ?? { inputTokens: 0, outputTokens: 0 }
+    const next = {
+      inputTokens: Math.max(previous.inputTokens, finiteTokenCount(inputTokens)),
+      outputTokens: Math.max(previous.outputTokens, finiteTokenCount(outputTokens)),
+    }
+    if (next.inputTokens === previous.inputTokens && next.outputTokens === previous.outputTokens) return null
+
+    this.inputTokens += next.inputTokens - previous.inputTokens
+    this.outputTokens += next.outputTokens - previous.outputTokens
+    this.messages.set(messageId, next)
+    return { inputTokens: this.inputTokens, outputTokens: this.outputTokens }
+  }
+}
+
+function finiteTokenCount(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
 }
 
 function markCancelled(runId: string): void {

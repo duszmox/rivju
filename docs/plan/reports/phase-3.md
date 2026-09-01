@@ -9,6 +9,14 @@
 - Added regression coverage for absent, blank, invalid, valid, and out-of-range
   numeric setting values.
 
+## Maintenance note — live usage counter
+
+- Real review runs now publish and persist token usage as assistant content
+  blocks arrive. Repeated blocks from one model turn are deduplicated by message
+  id, and the terminal SDK result still replaces the live estimate with its
+  authoritative all-model token and cost totals.
+- Added regression coverage for multi-block and multi-turn token aggregation.
+
 ## Built
 
 - Boot-time seeding of the `rivju-user-skills` local plugin under
