@@ -1,7 +1,7 @@
 organization:
-    id: 9ea390d7-1566-437d-92ce-92e779f2d6b0
-    name: Sleep ltd
+  id: 9ea390d7-1566-437d-92ce-92e779f2d6b0
+  name: Sleep ltd
 project:
-    id: 6cf70039-82ce-47d9-a33a-6e25afaf4912
-    slug: circleci/LbBnD1tkWh8Ev93NT5hX7V/ETR7ZkaLGZx1VaDVDwox2D
-    name: rivju
+  id: 6cf70039-82ce-47d9-a33a-6e25afaf4912
+  slug: circleci/LbBnD1tkWh8Ev93NT5hX7V/ETR7ZkaLGZx1VaDVDwox2D
+  name: rivju
