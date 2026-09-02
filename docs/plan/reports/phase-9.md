@@ -42,7 +42,8 @@ Nightlies remain unsigned until trusted signing is configured.
 - `npx tsc --noEmit`, `npm run lint`, and the release-file formatting check
   pass.
 - The full Vitest suite passes: 14 files and 133 tests.
-- Seven release metadata/manifest tests and three npm installer tests pass.
+- Seven release metadata/manifest tests and four npm installer tests pass,
+  including invocation through npm's executable symlink.
 - `npm pack --dry-run` contains exactly four npm package files and produces a
   2.9 kB tarball.
 - `npm run build`, `npm run dist:dir`, and an unsigned local `npm run dist:mac`

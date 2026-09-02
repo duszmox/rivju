@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto'
-import { createWriteStream } from 'node:fs'
+import { createWriteStream, realpathSync } from 'node:fs'
 import { chmod, mkdir, readFile, rename, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
@@ -115,7 +115,10 @@ export async function run(args = process.argv.slice(2)) {
 }
 
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : ''
-if (invokedPath === fileURLToPath(import.meta.url)) {
+if (
+  invokedPath &&
+  realpathSync(invokedPath) === realpathSync(fileURLToPath(import.meta.url))
+) {
   run().catch((error) => {
     console.error(
       `rivju installer: ${error instanceof Error ? error.message : String(error)}`,
