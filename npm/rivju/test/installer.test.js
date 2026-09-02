@@ -21,6 +21,11 @@ const packageRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
 )
+// CI stamps the release version into package.json before running the tests,
+// so the expected asset name has to follow whatever the CLI will read back.
+const { version } = JSON.parse(
+  await readFile(path.join(packageRoot, 'package.json'), 'utf8'),
+)
 
 describe('rivju npm installer', () => {
   it('maps supported hosts onto immutable release assets', () => {
@@ -62,7 +67,7 @@ describe('rivju npm installer', () => {
     const binDirectory = path.join(directory, 'node_modules', '.bin')
     const downloadDirectory = path.join(directory, 'downloads')
     const executable = path.join(binDirectory, 'rivju')
-    const artifact = resolveArtifact('0.1.0-rc.0')
+    const artifact = resolveArtifact(version)
     const artifactBytes = Buffer.from('test installer')
     const checksum = createHash('sha256').update(artifactBytes).digest('hex')
     const fetchStub = path.join(directory, 'fetch-stub.mjs')
