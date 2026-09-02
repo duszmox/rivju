@@ -3,6 +3,7 @@ const packageJson = require('./package.json')
 const nightly = /-nightly\.\d{8}\.\d+$/.test(packageJson.version)
 const channel = nightly ? 'nightly' : 'latest'
 const signingRequired = process.env.RIVJU_REQUIRE_SIGNING === '1'
+const windowsSigningRequired = signingRequired && !nightly
 
 function requireEnvironment(names, platform) {
   if (!signingRequired) return
@@ -28,7 +29,7 @@ if (process.platform === 'darwin') {
 }
 
 const azureSignOptions =
-  signingRequired && process.platform === 'win32'
+  windowsSigningRequired && process.platform === 'win32'
     ? (() => {
         requireEnvironment(
           [
@@ -90,6 +91,7 @@ module.exports = {
   win: {
     icon: 'build/icon.png',
     target: ['nsis'],
+    signExecutable: windowsSigningRequired,
     ...(azureSignOptions ? { azureSignOptions } : {}),
   },
   nsis: {

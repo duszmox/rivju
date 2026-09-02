@@ -32,8 +32,9 @@ bundled migration journal stops startup with a downgrade/newer-database error.
 The signing and trusted-publisher setup is documented in `docs/releasing.md`.
 CircleCI does not support npm provenance statements, and GitHub artifact
 attestations require GitHub Actions, so neither is claimed. Checksums, macOS
-signing/notarization, Windows Trusted Signing, immutable assets, and OIDC npm
-publishing are retained.
+signing/notarization, Windows Trusted Signing for candidates and stable
+releases, immutable assets, and OIDC npm publishing are retained. Windows
+Nightlies remain unsigned until trusted signing is configured.
 
 ## Verification
 

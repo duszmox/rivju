@@ -98,14 +98,17 @@ Release and update manifests; then assigns the matching npm version to
 Every push to `main` publishes a version derived from the next stable patch,
 UTC date, and CircleCI build number. Nightly publishing has no manual gate.
 Stable installations never switch to the Nightly feed, and Nightly
-installations never switch to stable.
+installations never switch to stable. macOS Nightlies are signed and notarized.
+Windows Nightlies are intentionally unsigned until Azure Artifact Signing is
+configured, so Windows shows an unknown-publisher warning and in-app Nightly
+updates do not have Authenticode publisher verification.
 
 ## Integrity and CI limitations
 
 All release downloads have a `SHA256SUMS` manifest. macOS artifacts are signed
-and notarized; Windows artifacts use Azure Trusted Signing. The npm
-bootstrapper verifies the selected artifact against the manifest before opening
-it.
+and notarized. Candidate and stable Windows artifacts require Azure Trusted
+Signing, while Windows Nightlies are unsigned. The npm bootstrapper verifies
+the selected artifact against the manifest before opening it.
 
 npm provenance statements are not available for CircleCI trusted-publisher
 workflows, and GitHub artifact attestations are specific to GitHub Actions.

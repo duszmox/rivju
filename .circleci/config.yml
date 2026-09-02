@@ -180,7 +180,13 @@ jobs:
             npm ci
             npm run build
             npm version $env:version --no-git-tag-version
-            $env:RIVJU_REQUIRE_SIGNING = '1'
+            Remove-Item Env:CSC_LINK,Env:CSC_KEY_PASSWORD -ErrorAction SilentlyContinue
+            if ($env:channel -eq 'nightly') {
+              Write-Host 'Building an unsigned Windows Nightly.'
+              $env:RIVJU_REQUIRE_SIGNING = '0'
+            } else {
+              $env:RIVJU_REQUIRE_SIGNING = '1'
+            }
             npx electron-builder --config electron-builder.config.cjs --win nsis --x64 --publish never
             New-Item -ItemType Directory -Force C:\rivju-release\artifacts\win-x64
             Copy-Item release\*.exe,release\*.yml,release\*.blockmap C:\rivju-release\artifacts\win-x64 -ErrorAction SilentlyContinue

@@ -2,9 +2,9 @@
 
 ## Goal
 
-Ship signed stable, release-candidate, and Nightly desktop builds through
-CircleCI, expose them through GitHub Releases and a minimal npm installer, and
-let packaged apps update safely from their fixed channel.
+Ship signed stable and release-candidate desktop builds plus Nightly builds
+through CircleCI, expose them through GitHub Releases and a minimal npm
+installer, and let packaged apps update safely from their fixed channel.
 
 ## Scope
 
@@ -12,7 +12,8 @@ let packaged apps update safely from their fixed channel.
   AppImage.
 - Nightly releases on every `main` push; approved candidate and stable tag
   workflows.
-- macOS notarization, Windows Trusted Signing, release checksums, and npm OIDC.
+- macOS notarization, Windows Trusted Signing for candidates and stable
+  releases, unsigned Windows Nightlies, release checksums, and npm OIDC.
 - A dependency-free npm bootstrapper that downloads a matching GitHub artifact
   and verifies its checksum.
 - Separate Stable and Nightly identities and user-data paths.
