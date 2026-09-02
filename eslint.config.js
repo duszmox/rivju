@@ -22,6 +22,7 @@ export default [
       'dist/**',
       'release/**',
       'drizzle/**',
+      'npm/rivju/**',
       '**/routeTree.gen.ts',
     ],
   },

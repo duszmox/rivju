@@ -79,6 +79,11 @@ const pending: QueuedReview[] = []
 const active = new Map<string, ActiveReview>()
 let disposing = false
 
+/** Update installation must never tear down an active or queued review. */
+export function hasLiveReviewRuns(): boolean {
+  return pending.length > 0 || active.size > 0
+}
+
 export function startReview(input: StartReviewInput): RunRow {
   if (disposing) throw new Error('rivju is shutting down')
   const db = getDb()

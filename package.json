@@ -10,12 +10,16 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "dist": "electron-vite build && electron-builder --mac",
-    "dist:dir": "electron-vite build && electron-builder --mac --dir",
+    "dist": "npm run dist:mac",
+    "dist:mac": "electron-vite build && electron-builder --config electron-builder.config.cjs --mac dmg zip",
+    "dist:win": "electron-vite build && electron-builder --config electron-builder.config.cjs --win nsis --x64",
+    "dist:linux": "electron-vite build && electron-builder --config electron-builder.config.cjs --linux AppImage --x64",
+    "dist:dir": "electron-vite build && electron-builder --config electron-builder.config.cjs --dir",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
+    "check:release": "prettier --check .circleci README.md docs/releasing.md docs/plan/phase-9-release.md docs/plan/reports/phase-9.md electron-builder.config.cjs npm/rivju scripts src/main/db/client.ts src/main/db/migrate.ts src/main/db/migrate.test.ts src/main/index.ts src/main/paths.ts src/main/release-channel.ts src/main/release-channel.test.ts src/main/trpc/routers/updates.ts src/main/updates src/renderer/routes/settings.tsx",
     "generate-routes": "tsr generate",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -41,6 +45,7 @@
     "clsx": "^2.1.1",
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.2",
+    "electron-updater": "^6.8.9",
     "gitdiff-parser": "^0.3.1",
     "lucide-react": "^0.577.0",
     "radix-ui": "^1.6.7",
@@ -74,39 +79,7 @@
     "prettier": "^3.8.1",
     "typescript": "^6.0.2",
     "vite": "^7.3.6",
-    "vitest": "^4.1.11"
-  },
-  "build": {
-    "appId": "app.rivju.desktop",
-    "productName": "rivju",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "out/**"
-    ],
-    "asarUnpack": [
-      "**/*.node",
-      "node_modules/@anthropic-ai/claude-agent-sdk-*/**"
-    ],
-    "extraResources": [
-      {
-        "from": "drizzle",
-        "to": "drizzle"
-      }
-    ],
-    "mac": {
-      "icon": "build/icon.icns",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64"
-          ]
-        }
-      ],
-      "identity": null,
-      "category": "public.app-category.developer-tools"
-    }
+    "vitest": "^4.1.11",
+    "yaml": "^2.9.0"
   }
 }
