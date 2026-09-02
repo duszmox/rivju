@@ -59,7 +59,9 @@ export function VerifyPanel(props: {
   const start = useMutation(trpc.runs.start.mutationOptions())
 
   const counts = countLifecycle(props.findings)
-  const openCount = counts.open
+  const openCount = props.findings.filter(
+    (finding) => finding.lifecycle === 'open' && finding.triage !== 'invalid',
+  ).length
   const completed = props.runs.some((item) => item.status === 'done')
   const verifying = props.runs.some(
     (item) =>
@@ -77,7 +79,7 @@ export function VerifyPanel(props: {
         <p className="island-kicker">Verification</p>
         <p className="mt-1 text-sm font-semibold text-(--sea-ink)">
           {openCount === 0
-            ? 'No open findings — nothing to re-check'
+            ? 'No eligible open findings — nothing to re-check'
             : `${openCount} open ${openCount === 1 ? 'finding' : 'findings'} to re-check`}
         </p>
         <MovementLine movement={movement.data} />
@@ -97,7 +99,7 @@ export function VerifyPanel(props: {
             !completed
               ? 'Run a full review first — verification compares against a completed review'
               : openCount === 0
-                ? 'No open findings to verify'
+                ? 'No eligible open findings to verify'
                 : undefined
           }
           onClick={() =>

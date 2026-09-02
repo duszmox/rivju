@@ -205,6 +205,24 @@ describe('re-anchoring open findings', () => {
     expect(summary.open.map((item) => item.id)).toEqual([stable.id])
     expect(db.select().from(findingEvent).all()).toHaveLength(0)
   })
+
+  it('does not re-anchor or verify findings marked invalid', async () => {
+    const eligible = insertFinding({ title: 'Check this finding', triage: 'valid' })
+    const invalid = insertFinding({
+      title: 'Do not check this finding', triage: 'invalid', triageNote: 'Expected behavior',
+    })
+    const summary = await reanchorOpenFindings({
+      db, mergeRequestId: mrId, runId, headSha: NEW,
+      worktreePath: newWorktree, mirrorPath: null, oldHeadSha: OLD,
+    })
+
+    expect(summary.checked).toBe(1)
+    expect(summary.open.map((item) => item.id)).toEqual([eligible.id])
+    expect(db.select().from(finding).where(eq(finding.id, invalid.id)).get()).toMatchObject({
+      lifecycle: 'open', currentLine: 5, triage: 'invalid',
+    })
+    expect(db.select().from(findingEvent).all().some((event) => event.findingId === invalid.id)).toBe(false)
+  })
 })
 
 describe('rename resolution', () => {

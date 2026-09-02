@@ -1,5 +1,5 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, ne } from 'drizzle-orm'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
@@ -22,7 +22,7 @@ export type ReanchorSummary = {
 }
 
 /**
- * Re-anchors every still-open finding of an MR against a fresh checkout at
+ * Re-anchors every still-open, non-invalid finding of an MR against a fresh checkout at
  * the new head. File-level work (reading the checkout) lives here; the
  * matching itself is the pure engine in `anchor.ts`. Stale findings are marked
  * immediately — `stale` means "the code moved or vanished", never "fixed" —
@@ -44,6 +44,7 @@ export async function reanchorOpenFindings(input: {
       and(
         eq(finding.mergeRequestId, input.mergeRequestId),
         eq(finding.lifecycle, 'open'),
+        ne(finding.triage, 'invalid'),
       ),
     )
     .all()

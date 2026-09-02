@@ -643,6 +643,11 @@ function DiffFileView(props: {
   const [contextLines, setContextLines] = useState(3)
   const attemptedAnchors = useRef(new Set<string>())
   const tokens = useShikiTokens(hunks, props.file.path)
+  const focusedFinding = props.findings.find(
+    (item) => item.id === props.focusedId,
+  )
+  const focusedFindingId = focusedFinding?.id
+  const focusedFindingLine = focusedFinding?.currentLine
 
   useEffect(() => {
     setHunks(parsed?.hunks ?? [])
@@ -677,24 +682,23 @@ function DiffFileView(props: {
   )
 
   useEffect(() => {
-    const focused = props.findings.find((item) => item.id === props.focusedId)
-    if (!focused?.currentLine) return
-    if (findChangeByNewLineNumber(hunks, focused.currentLine)) {
+    if (!focusedFindingId || !focusedFindingLine) return
+    if (findChangeByNewLineNumber(hunks, focusedFindingLine)) {
       requestAnimationFrame(() =>
         document
-          .getElementById(`finding-${focused.id}`)
+          .getElementById(`finding-${focusedFindingId}`)
           ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
       )
       return
     }
-    if (attemptedAnchors.current.has(focused.id)) return
-    attemptedAnchors.current.add(focused.id)
-    const oldLine = getCorrespondingOldLineNumber(hunks, focused.currentLine)
+    if (attemptedAnchors.current.has(focusedFindingId)) return
+    attemptedAnchors.current.add(focusedFindingId)
+    const oldLine = getCorrespondingOldLineNumber(hunks, focusedFindingLine)
     void expand(
-      Math.max(1, (oldLine > 0 ? oldLine : focused.currentLine) - 3),
-      (oldLine > 0 ? oldLine : focused.currentLine) + 3,
+      Math.max(1, (oldLine > 0 ? oldLine : focusedFindingLine) - 3),
+      (oldLine > 0 ? oldLine : focusedFindingLine) + 3,
     )
-  }, [expand, hunks, props.findings, props.focusedId])
+  }, [expand, focusedFindingId, focusedFindingLine, hunks])
 
   const widgets = useMemo(() => {
     const groups = new Map<string, FindingRow[]>()
@@ -842,6 +846,7 @@ function FindingCard(props: {
   onTriage: (finding: FindingRow, state: TriageState, note?: string) => void
 }) {
   const [note, setNote] = useState(props.finding.triageNote ?? '')
+  const [expanded, setExpanded] = useState(props.finding.triage !== 'invalid')
   const ref = useRef<HTMLElement>(null)
   useEffect(() => {
     if (props.focused) ref.current?.focus({ preventScroll: true })
@@ -849,12 +854,19 @@ function FindingCard(props: {
   useEffect(() => {
     setNote(props.finding.triageNote ?? '')
   }, [props.finding.triageNote])
+  useEffect(() => {
+    setExpanded(props.finding.triage !== 'invalid')
+  }, [props.finding.triage])
+  const collapsed = props.finding.triage === 'invalid' && !expanded
   return (
     <article
       ref={ref}
       id={`finding-${props.finding.id}`}
       tabIndex={-1}
-      onClick={() => props.onFocus(props.finding)}
+      onClick={() => {
+        props.onFocus(props.finding)
+        if (collapsed) setExpanded(true)
+      }}
       className={`my-2 rounded-xl border bg-[var(--surface-strong)] p-3 text-left shadow-sm outline-none ${props.focused ? 'border-[var(--lagoon-deep)] ring-2 ring-[var(--hero-a)]' : 'border-[var(--line)]'}`}
     >
       <div className="flex flex-wrap items-center gap-1.5">
@@ -869,21 +881,43 @@ function FindingCard(props: {
             tone={lifecycleTone(props.finding.lifecycle)}
           />
         ) : null}
+        {props.finding.triage === 'invalid' ? (
+          <Chip value="invalid" tone="text-destructive" />
+        ) : null}
         {props.finding.createdRunId === props.run.id ? (
           <Chip value="new" tone="text-[var(--lagoon-deep)]" />
         ) : null}
         <span className="ml-auto font-mono text-[9px] text-(--sea-ink-soft)">
           run {props.run.id.slice(0, 8)}
         </span>
+        {props.finding.triage === 'invalid' ? (
+          <button
+            type="button"
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Expand invalid finding' : 'Collapse invalid finding'}
+            title={collapsed ? 'Expand invalid finding' : 'Collapse invalid finding'}
+            className="rounded-md p-1 text-(--sea-ink-soft) hover:bg-[var(--hero-a)]"
+            onClick={(event) => {
+              event.stopPropagation()
+              setExpanded((current) => !current)
+            }}
+          >
+            {collapsed ? (
+              <ChevronRight className="size-3.5" />
+            ) : (
+              <ChevronDown className="size-3.5" />
+            )}
+          </button>
+        ) : null}
       </div>
       <h4 className="mt-2 text-sm font-bold text-(--sea-ink)">
         {props.finding.title}
       </h4>
-      {props.finding.body ? <MarkdownText value={props.finding.body} /> : null}
-      {props.finding.suggestedFix ? (
+      {!collapsed && props.finding.body ? <MarkdownText value={props.finding.body} /> : null}
+      {!collapsed && props.finding.suggestedFix ? (
         <SuggestedFix value={props.finding.suggestedFix} />
       ) : null}
-      <div
+      {!collapsed ? <div
         className="mt-3 flex items-center gap-1"
         onClick={(event) => event.stopPropagation()}
       >
@@ -912,8 +946,8 @@ function FindingCard(props: {
         >
           <MessageSquareText className="size-3.5" />
         </button>
-      </div>
-      {props.noteOpen ? (
+      </div> : null}
+      {!collapsed && props.noteOpen ? (
         <div className="mt-2" onClick={(event) => event.stopPropagation()}>
           <Textarea
             autoFocus
@@ -947,7 +981,7 @@ function FindingCard(props: {
             </Button>
           </div>
         </div>
-      ) : props.finding.triageNote ? (
+      ) : !collapsed && props.finding.triageNote ? (
         <p className="mt-2 rounded-md bg-[var(--foam)] px-2 py-1.5 text-xs italic text-(--sea-ink-soft)">
           {props.finding.triageNote}
         </p>
