@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
   GitMerge,
   LoaderCircle,
   Play,
+  RefreshCw,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
@@ -36,12 +37,23 @@ function MergeRequestDetail() {
   const { instanceId, gitlabProjectId, iid } = Route.useParams()
   const { runId } = Route.useSearch()
   const trpc = useTrpc()
+  const queryClient = useQueryClient()
+  const coordinates = {
+    instanceId,
+    gitlabProjectId: Number(gitlabProjectId),
+    iid: Number(iid),
+  }
+  const detailOptions = trpc.mergeRequests.detail.queryOptions(coordinates, {
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
 
-  const detail = useQuery(
-    trpc.mergeRequests.detail.queryOptions({
-      instanceId,
-      gitlabProjectId: Number(gitlabProjectId),
-      iid: Number(iid),
+  const detail = useQuery(detailOptions)
+  const pullLatest = useMutation(
+    trpc.mergeRequests.pullLatest.mutationOptions({
+      onSuccess: (latest) => {
+        queryClient.setQueryData(detailOptions.queryKey, latest)
+      },
     }),
   )
 
@@ -72,7 +84,19 @@ function MergeRequestDetail() {
     )
   }
 
-  const { mr, description, labels, diffRefs, files } = detail.data
+  const {
+    mr,
+    description,
+    labels,
+    diffRefs,
+    files,
+    hasNewVersion,
+    previousHeadSha,
+    totalAdditions,
+    totalDeletions,
+    lineStatsComplete,
+  } = detail.data
+  const totalChangedLines = totalAdditions + totalDeletions
 
   return (
     <div className="mx-auto max-w-[1600px] px-8 py-10">
@@ -80,7 +104,7 @@ function MergeRequestDetail() {
         ← Review queue
       </Link>
 
-      <div className="mt-3 flex items-start justify-between gap-6">
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-6">
         <div className="min-w-0">
           <p className="island-kicker flex items-center gap-2">
             <GitMerge className="size-3.5" />
@@ -105,7 +129,38 @@ function MergeRequestDetail() {
             {mr.title}
           </h1>
         </div>
+        <div className="flex flex-wrap items-stretch justify-end gap-3">
+          <div className="island-shell flex items-center gap-4 rounded-xl px-4 py-2.5">
+            <div>
+              <p className="text-xl font-bold text-(--sea-ink)">
+                {lineStatsComplete
+                  ? totalChangedLines
+                  : `≥${totalChangedLines}`}
+              </p>
+              <p className="text-[10px] uppercase tracking-wide text-(--sea-ink-soft)">
+                lines changed
+              </p>
+            </div>
+            <div className="flex gap-2 font-mono text-sm font-bold">
+              <span className="text-(--palm)">+{totalAdditions}</span>
+              <span className="text-destructive">−{totalDeletions}</span>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {hasNewVersion && diffRefs ? (
+        <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm dark:border-amber-700 dark:bg-amber-950/30">
+          <div>
+            <p className="font-semibold text-amber-800 dark:text-amber-300">
+              A newer merge request version is available
+            </p>
+            <p className="mt-0.5 font-mono text-xs text-amber-700 dark:text-amber-400">
+              {previousHeadSha?.slice(0, 8)} → {diffRefs.headSha.slice(0, 8)}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <dl className="island-shell mt-6 grid grid-cols-2 gap-x-8 gap-y-3 rounded-2xl p-6 text-sm sm:grid-cols-3">
         <div>
@@ -152,6 +207,10 @@ function MergeRequestDetail() {
           baseSha={diffRefs.baseSha}
           headSha={diffRefs.headSha}
           labels={labels}
+          hasNewVersion={hasNewVersion}
+          pullPending={pullLatest.isPending}
+          pullError={pullLatest.isError ? pullLatest.error.message : null}
+          onPull={() => pullLatest.mutate(coordinates)}
         />
       ) : null}
 
@@ -195,6 +254,10 @@ function MergeRequestDetail() {
                 (renamed from {file.oldPath})
               </span>
             ) : null}
+            <span className="ml-auto flex shrink-0 gap-2 font-mono text-[11px] font-semibold">
+              <span className="text-(--palm)">+{file.additions}</span>
+              <span className="text-destructive">−{file.deletions}</span>
+            </span>
           </li>
         ))}
       </ul>
@@ -218,6 +281,10 @@ function RepositoryPreparation(props: {
   baseSha: string
   headSha: string
   labels: string[]
+  hasNewVersion: boolean
+  pullPending: boolean
+  pullError: string | null
+  onPull: () => void
 }) {
   const trpc = useTrpc()
   const prepare = useMutation(trpc.repos.prepare.mutationOptions())
@@ -257,22 +324,36 @@ function RepositoryPreparation(props: {
   }, [model, preflight.data, effective.data])
 
   useEffect(() => {
-    prepare.mutate(props, { onSettled: () => void status.refetch() })
+    if (props.hasNewVersion) return
+    prepare.mutate(
+      {
+        instanceId: props.instanceId,
+        gitlabProjectId: props.gitlabProjectId,
+        iid: props.iid,
+        baseSha: props.baseSha,
+        headSha: props.headSha,
+      },
+      { onSettled: () => void status.refetch() },
+    )
   }, [
     props.instanceId,
     props.gitlabProjectId,
     props.iid,
     props.baseSha,
     props.headSha,
+    props.hasNewVersion,
   ])
 
   const phase = status.data?.phase ?? (prepare.isPending ? 'cloning' : 'idle')
-  const failed = prepare.isError || phase === 'error'
-  const ready = phase === 'ready'
-  const needsScoping = phase === 'needs_scoping'
+  const failed = !props.hasNewVersion && (prepare.isError || phase === 'error')
+  const ready = !props.hasNewVersion && phase === 'ready'
+  const needsScoping =
+    !props.hasNewVersion && phase === 'needs_scoping'
   return (
     <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm">
-      {ready || needsScoping ? (
+      {props.hasNewVersion ? (
+        <RefreshCw className="mt-0.5 size-4 shrink-0 text-amber-700" />
+      ) : ready || needsScoping ? (
         <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-(--palm)" />
       ) : failed ? (
         <span className="text-destructive">×</span>
@@ -280,22 +361,44 @@ function RepositoryPreparation(props: {
         <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin text-[var(--lagoon-deep)]" />
       )}
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-(--sea-ink)">
-          {ready
-            ? 'Detached checkout ready'
-            : needsScoping
-              ? 'Checkout ready · file scope required'
-              : failed
-                ? 'Repository preparation failed'
-                : repoPhaseLabel(phase)}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-medium text-(--sea-ink)">
+            {props.hasNewVersion
+              ? 'New version available'
+              : ready
+                ? 'Detached checkout ready'
+                : needsScoping
+                  ? 'Checkout ready · file scope required'
+                  : failed
+                    ? 'Repository preparation failed'
+                    : repoPhaseLabel(phase)}
+          </p>
+          {props.hasNewVersion || ready || needsScoping ? (
+            <Button
+              size="sm"
+              variant={props.hasNewVersion ? 'default' : 'outline'}
+              disabled={props.pullPending || prepare.isPending}
+              onClick={props.onPull}
+            >
+              <RefreshCw
+                className={props.pullPending ? 'animate-spin' : undefined}
+              />
+              {props.hasNewVersion ? 'Pull latest version' : 'Fetch + pull'}
+            </Button>
+          ) : null}
+        </div>
         <p className="mt-0.5 truncate text-xs text-(--sea-ink-soft)">
-          {failed
+          {props.hasNewVersion
+            ? 'Pull latest to fetch and prepare the new head.'
+            : failed
             ? prepare.error instanceof Error
               ? prepare.error.message
               : status.data?.detail
             : (status.data?.detail ?? 'Starting repository preparation…')}
         </p>
+        {props.pullError ? (
+          <p className="mt-1 text-xs text-destructive">{props.pullError}</p>
+        ) : null}
         {ready && preflight.data?.status === 'ok' ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Select
@@ -348,7 +451,12 @@ function RepositoryPreparation(props: {
               disabled={start.isPending}
               onClick={() =>
                 start.mutate({
-                  ...props,
+                  instanceId: props.instanceId,
+                  gitlabProjectId: props.gitlabProjectId,
+                  iid: props.iid,
+                  baseSha: props.baseSha,
+                  headSha: props.headSha,
+                  labels: props.labels,
                   model: model === INHERIT ? undefined : model,
                   effort:
                     effort === INHERIT

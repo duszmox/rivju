@@ -60,12 +60,19 @@ export interface MergeRequestDetail {
   description: string | null
   labels: string[]
   diffRefs: { baseSha: string; headSha: string; startSha: string } | null
+  previousHeadSha: string | null
+  hasNewVersion: boolean
+  totalAdditions: number
+  totalDeletions: number
+  lineStatsComplete: boolean
   files: {
     newPath: string
     oldPath: string
     newFile: boolean
     deletedFile: boolean
     renamedFile: boolean
+    additions: number
+    deletions: number
   }[]
 }
 
@@ -82,17 +89,23 @@ export interface ReviewQueue {
 
 // ---- per-instance client cache -------------------------------------------
 
-const clientCache = new Map<string, { client: GitlabClient; tokenFingerprint: string }>()
+const clientCache = new Map<
+  string,
+  { client: GitlabClient; tokenFingerprint: string }
+>()
 
 function fingerprintToken(token: string): string {
   // Identifies the token so a re-auth invalidates the cached client, without
   // ever logging or returning the plaintext.
   let hash = 5381
-  for (let i = 0; i < token.length; i++) hash = ((hash << 5) + hash + token.charCodeAt(i)) | 0
+  for (let i = 0; i < token.length; i++)
+    hash = ((hash << 5) + hash + token.charCodeAt(i)) | 0
   return String(hash)
 }
 
-export function getClientForInstance(instance: GitlabInstanceRow): GitlabClient {
+export function getClientForInstance(
+  instance: GitlabInstanceRow,
+): GitlabClient {
   const token = decryptToken(instance.tokenCiphertext)
   const fp = fingerprintToken(token)
   const cached = clientCache.get(instance.id)
@@ -129,12 +142,20 @@ export function majorVersion(version: string | null): number {
 
 /** Never returns token material — ciphertext stays in the DB. */
 export function listInstances(): InstanceView[] {
-  const rows = getDb().select().from(gitlabInstance).orderBy(desc(gitlabInstance.createdAt)).all()
+  const rows = getDb()
+    .select()
+    .from(gitlabInstance)
+    .orderBy(desc(gitlabInstance.createdAt))
+    .all()
   return rows.map(toInstanceView)
 }
 
 export function getInstance(instanceId: string): GitlabInstanceRow {
-  const row = getDb().select().from(gitlabInstance).where(eq(gitlabInstance.id, instanceId)).get()
+  const row = getDb()
+    .select()
+    .from(gitlabInstance)
+    .where(eq(gitlabInstance.id, instanceId))
+    .get()
   if (!row) throw new Error(`Unknown instance: ${instanceId}`)
   return row
 }
@@ -172,13 +193,22 @@ export async function addInstance(input: {
 }
 
 /** Re-validates stored credentials; refreshes username/version from the server. */
-export async function validateInstance(instanceId: string): Promise<InstanceView> {
+export async function validateInstance(
+  instanceId: string,
+): Promise<InstanceView> {
   const instance = getInstance(instanceId)
   const client = getClientForInstance(instance)
-  const [user, version] = await Promise.all([client.currentUser(), client.version()])
+  const [user, version] = await Promise.all([
+    client.currentUser(),
+    client.version(),
+  ])
   const updated = getDb()
     .update(gitlabInstance)
-    .set({ username: user.username, userId: String(user.id), gitlabVersion: version.version })
+    .set({
+      username: user.username,
+      userId: String(user.id),
+      gitlabVersion: version.version,
+    })
     .where(eq(gitlabInstance.id, instanceId))
     .returning()
     .get()
@@ -186,7 +216,10 @@ export async function validateInstance(instanceId: string): Promise<InstanceView
 }
 
 /** Replace the token for an existing instance (re-auth), after validating it. */
-export async function reAuthInstance(instanceId: string, token: string): Promise<InstanceView> {
+export async function reAuthInstance(
+  instanceId: string,
+  token: string,
+): Promise<InstanceView> {
   const instance = getInstance(instanceId)
   const probe = new GitlabClient({ baseUrl: instance.baseUrl, token })
   const [user, version, tokenInfo] = await Promise.all([
@@ -231,10 +264,14 @@ function normalizeBaseUrl(input: string): string {
   try {
     url = new URL(input)
   } catch {
-    throw new Error(`"${input}" is not a valid URL. Use e.g. https://gitlab.example.com`)
+    throw new Error(
+      `"${input}" is not a valid URL. Use e.g. https://gitlab.example.com`,
+    )
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new Error('Base URL must start with https:// (or http:// for local test instances)')
+    throw new Error(
+      'Base URL must start with https:// (or http:// for local test instances)',
+    )
   }
   return url.origin
 }
@@ -287,7 +324,9 @@ export async function searchProjects(
 ): Promise<ProjectSearchResult[]> {
   const instance = getInstance(instanceId)
   const client = getClientForInstance(instance)
-  const query: Record<string, string | number | boolean | undefined> = { simple: true }
+  const query: Record<string, string | number | boolean | undefined> = {
+    simple: true,
+  }
   if (search) query.search = search
 
   const [membership, starred] = await Promise.all([
@@ -359,13 +398,17 @@ export function pickProject(input: {
   return toProjectView(inserted)
 }
 
-export function unpickProject(instanceId: string, projectId: string): { id: string } {
+export function unpickProject(
+  instanceId: string,
+  projectId: string,
+): { id: string } {
   const deleted = getDb()
     .delete(project)
     .where(and(eq(project.instanceId, instanceId), eq(project.id, projectId)))
     .returning({ id: project.id })
     .get()
-  if (!deleted) throw new Error(`Unknown project ${projectId} on instance ${instanceId}`)
+  if (!deleted)
+    throw new Error(`Unknown project ${projectId} on instance ${instanceId}`)
   return deleted
 }
 
@@ -389,11 +432,22 @@ export async function fetchReviewQueue(): Promise<ReviewQueue> {
         if (userId === null || Number.isNaN(userId)) return
         const client = getClientForInstance(instance)
         const [asReviewer, asAssignee] = await Promise.all([
-          client.listMergeRequests({ reviewer_id: userId, state: 'opened', scope: 'all' }),
-          client.listMergeRequests({ assignee_id: userId, state: 'opened', scope: 'all' }),
+          client.listMergeRequests({
+            reviewer_id: userId,
+            state: 'opened',
+            scope: 'all',
+          }),
+          client.listMergeRequests({
+            assignee_id: userId,
+            state: 'opened',
+            scope: 'all',
+          }),
         ])
         for (const mr of mergeAndDedupe(asReviewer, asAssignee)) {
-          items.set(`${instance.id}:${mr.project_id ?? '?'}:${mr.iid}`, toListItem(instance, mr))
+          items.set(
+            `${instance.id}:${mr.project_id ?? '?'}:${mr.iid}`,
+            toListItem(instance, mr),
+          )
         }
       } catch (err) {
         instanceErrors.push({
@@ -425,7 +479,10 @@ export function mergeAndDedupe(
   return [...merged.values()]
 }
 
-function toListItem(instance: GitlabInstanceRow, mr: GitlabMergeRequest): MergeRequestListItem {
+function toListItem(
+  instance: GitlabInstanceRow,
+  mr: GitlabMergeRequest,
+): MergeRequestListItem {
   return {
     instanceId: instance.id,
     instanceLabel: instance.label,
@@ -477,24 +534,47 @@ export async function browseProjectMergeRequests(
 }
 
 /**
- * MR detail: fetch MR + changed files live, capture `diff_refs`, and persist
- * the project + merge_request rows so Phase 2's repo layer can resolve head
- * sha and branches without a round trip.
+ * Fetch MR metadata and changed files live. A page-open check leaves an
+ * existing accepted head untouched; the pull action accepts the fetched head.
+ * First-time loads persist the head so repository preparation has a baseline.
  */
 export async function fetchMergeRequestDetail(
   instanceId: string,
   gitlabProjectId: number,
   iid: number,
+  options: { acceptLatest?: boolean } = { acceptLatest: true },
 ): Promise<MergeRequestDetail> {
   const instance = getInstance(instanceId)
   const client = getClientForInstance(instance)
+  const previousHeadSha = storedMergeRequestHead(
+    instanceId,
+    gitlabProjectId,
+    iid,
+  )
 
   const [mr, files] = await Promise.all([
     client.getMergeRequest(gitlabProjectId, iid),
     client.listMergeRequestDiffs(gitlabProjectId, iid),
   ])
 
-  await persistMrHierarchy(instance, gitlabProjectId, mr)
+  const currentHeadSha = mr.diff_refs?.head_sha ?? null
+  const acceptLatest = options.acceptLatest ?? true
+  await persistMrHierarchy(instance, gitlabProjectId, mr, {
+    updateHead: acceptLatest || previousHeadSha === null,
+  })
+
+  const filesWithStats = files.map((file) => {
+    const stats = countDiffLines(file.diff ?? '')
+    return {
+      newPath: file.new_path,
+      oldPath: file.old_path,
+      newFile: file.new_file ?? false,
+      deletedFile: file.deleted_file ?? false,
+      renamedFile: file.renamed_file ?? false,
+      additions: stats.additions,
+      deletions: stats.deletions,
+    }
+  })
 
   return {
     mr: toListItem(instance, mr),
@@ -507,20 +587,69 @@ export async function fetchMergeRequestDetail(
           startSha: mr.diff_refs.start_sha,
         }
       : null,
-    files: files.map((f) => ({
-      newPath: f.new_path,
-      oldPath: f.old_path,
-      newFile: f.new_file ?? false,
-      deletedFile: f.deleted_file ?? false,
-      renamedFile: f.renamed_file ?? false,
-    })),
+    previousHeadSha,
+    hasNewVersion:
+      !acceptLatest &&
+      previousHeadSha !== null &&
+      currentHeadSha !== null &&
+      previousHeadSha !== currentHeadSha,
+    totalAdditions: filesWithStats.reduce(
+      (total, file) => total + file.additions,
+      0,
+    ),
+    totalDeletions: filesWithStats.reduce(
+      (total, file) => total + file.deletions,
+      0,
+    ),
+    lineStatsComplete: files.every(
+      (file) =>
+        file.diff !== null &&
+        file.diff !== undefined &&
+        file.collapsed !== true &&
+        file.too_large !== true,
+    ),
+    files: filesWithStats,
   }
+}
+
+export function countDiffLines(diff: string): {
+  additions: number
+  deletions: number
+} {
+  let additions = 0
+  let deletions = 0
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('+') && !line.startsWith('+++')) additions++
+    if (line.startsWith('-') && !line.startsWith('---')) deletions++
+  }
+  return { additions, deletions }
+}
+
+function storedMergeRequestHead(
+  instanceId: string,
+  gitlabProjectId: number,
+  iid: number,
+): string | null {
+  const row = getDb()
+    .select({ headSha: mergeRequest.lastSeenHeadSha })
+    .from(mergeRequest)
+    .innerJoin(project, eq(project.id, mergeRequest.projectId))
+    .where(
+      and(
+        eq(project.instanceId, instanceId),
+        eq(project.gitlabProjectId, String(gitlabProjectId)),
+        eq(mergeRequest.iid, iid),
+      ),
+    )
+    .get()
+  return row?.headSha ?? null
 }
 
 async function persistMrHierarchy(
   instance: GitlabInstanceRow,
   gitlabProjectId: number,
   mr: GitlabMergeRequest,
+  options: { updateHead: boolean },
 ): Promise<void> {
   const db = getDb()
   let projectRow = db
@@ -548,29 +677,41 @@ async function persistMrHierarchy(
       .returning()
       .get()
   }
-  db.insert(mergeRequest)
-    .values({
-      projectId: projectRow.id,
-      iid: mr.iid,
-      title: mr.title,
-      description: mr.description ?? null,
-      author: mr.author?.username ?? null,
-      sourceBranch: mr.source_branch,
-      targetBranch: mr.target_branch,
-      state: mr.state,
-      webUrl: mr.web_url,
-      updatedAt: mr.updated_at ? new Date(mr.updated_at) : null,
-      lastSeenHeadSha: mr.diff_refs?.head_sha ?? null,
-    })
+  const insert = db.insert(mergeRequest).values({
+    projectId: projectRow.id,
+    iid: mr.iid,
+    title: mr.title,
+    description: mr.description ?? null,
+    author: mr.author?.username ?? null,
+    sourceBranch: mr.source_branch,
+    targetBranch: mr.target_branch,
+    state: mr.state,
+    webUrl: mr.web_url,
+    updatedAt: mr.updated_at ? new Date(mr.updated_at) : null,
+    lastSeenHeadSha: mr.diff_refs?.head_sha ?? null,
+  })
+  const updatedFields = {
+    title: mr.title,
+    description: mr.description ?? null,
+    state: mr.state,
+    updatedAt: mr.updated_at ? new Date(mr.updated_at) : null,
+  }
+  if (options.updateHead) {
+    insert
+      .onConflictDoUpdate({
+        target: [mergeRequest.projectId, mergeRequest.iid],
+        set: {
+          ...updatedFields,
+          lastSeenHeadSha: mr.diff_refs?.head_sha ?? null,
+        },
+      })
+      .run()
+    return
+  }
+  insert
     .onConflictDoUpdate({
       target: [mergeRequest.projectId, mergeRequest.iid],
-      set: {
-        title: mr.title,
-        description: mr.description ?? null,
-        state: mr.state,
-        updatedAt: mr.updated_at ? new Date(mr.updated_at) : null,
-        lastSeenHeadSha: mr.diff_refs?.head_sha ?? null,
-      },
+      set: updatedFields,
     })
     .run()
 }
@@ -587,7 +728,8 @@ async function client_getProject(
 
 export function describeGitlabError(err: unknown): string {
   if (err instanceof GitlabApiError) {
-    if (err.status === 401) return 'Token rejected (401). Re-authenticate this instance.'
+    if (err.status === 401)
+      return 'Token rejected (401). Re-authenticate this instance.'
     return err.message
   }
   return err instanceof Error ? err.message : String(err)

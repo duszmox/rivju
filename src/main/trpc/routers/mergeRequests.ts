@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { fetchMergeRequestDetail, fetchReviewQueue } from '../../gitlab/service.ts'
+import {
+  fetchMergeRequestDetail,
+  fetchReviewQueue,
+} from '../../gitlab/service.ts'
 import { publicProcedure, router } from '../base.ts'
 
 export const mergeRequestsRouter = router({
@@ -11,9 +14,8 @@ export const mergeRequestsRouter = router({
   reviewQueue: publicProcedure.query(() => fetchReviewQueue()),
 
   /**
-   * MR detail: metadata, `diff_refs` (base/head/start sha) and the
-   * changed-file list. Also persists the project + merge_request rows so the
-   * Phase 2 repo layer can resolve branches and head sha.
+   * Live MR check used on every detail-page mount. It returns a newer remote
+   * head without accepting it, so the renderer can offer an explicit pull.
    */
   detail: publicProcedure
     .input(
@@ -24,6 +26,31 @@ export const mergeRequestsRouter = router({
       }),
     )
     .query(({ input }) =>
-      fetchMergeRequestDetail(input.instanceId, input.gitlabProjectId, input.iid),
+      fetchMergeRequestDetail(
+        input.instanceId,
+        input.gitlabProjectId,
+        input.iid,
+        {
+          acceptLatest: false,
+        },
+      ),
+    ),
+  pullLatest: publicProcedure
+    .input(
+      z.object({
+        instanceId: z.string().min(1),
+        gitlabProjectId: z.number().int().positive(),
+        iid: z.number().int().positive(),
+      }),
+    )
+    .mutation(({ input }) =>
+      fetchMergeRequestDetail(
+        input.instanceId,
+        input.gitlabProjectId,
+        input.iid,
+        {
+          acceptLatest: true,
+        },
+      ),
     ),
 })

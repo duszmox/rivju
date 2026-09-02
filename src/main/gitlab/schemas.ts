@@ -106,6 +106,8 @@ export const gitlabDiffFileSchema = z.object({
   deleted_file: z.boolean().nullish(),
   diff: z.string().nullish(),
   generated_file: z.boolean().nullish(),
+  collapsed: z.boolean().nullish(),
+  too_large: z.boolean().nullish(),
 })
 
 /** `GET /projects/:id/repository/tree` list item. */
@@ -129,4 +131,6 @@ export type GitlabProject = z.infer<typeof gitlabProjectSchema>
 export type GitlabMergeRequest = z.infer<typeof gitlabMergeRequestSchema>
 export type GitlabDiffRefs = z.infer<typeof gitlabDiffRefsSchema>
 export type GitlabDiffFile = z.infer<typeof gitlabDiffFileSchema>
-export type GitlabPersonalAccessToken = z.infer<typeof gitlabPersonalAccessTokenSchema>
+export type GitlabPersonalAccessToken = z.infer<
+  typeof gitlabPersonalAccessTokenSchema
+>

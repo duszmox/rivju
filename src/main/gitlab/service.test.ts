@@ -1,4 +1,12 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -6,16 +14,12 @@ import { fileURLToPath } from 'node:url'
 import { closeDatabase, openDatabase } from '../db/client.ts'
 import type { RivjuDatabase } from '../db/client.ts'
 import { applyMigrations } from '../db/migrate.ts'
-import {
-  finding,
-  gitlabInstance,
-  mergeRequest,
-  project,
-} from '../db/schema.ts'
+import { finding, gitlabInstance, mergeRequest, project } from '../db/schema.ts'
 import {
   addInstance,
   deleteInstance,
   fetchMergeRequestDetail,
+  countDiffLines,
   fetchReviewQueue,
   listInstances,
   majorVersion,
@@ -35,17 +39,23 @@ vi.mock('electron', () => ({
     isEncryptionAvailable: () => true,
     encryptString: (plaintext: string) => Buffer.from(`enc:${plaintext}`),
     // real safeStorage.decryptString returns a string
-    decryptString: (buffer: Buffer) => Buffer.from(buffer.toString('utf8').replace(/^enc:/, '')).toString('utf8'),
+    decryptString: (buffer: Buffer) =>
+      Buffer.from(buffer.toString('utf8').replace(/^enc:/, '')).toString(
+        'utf8',
+      ),
   },
 }))
 
-const migrationsDir = fileURLToPath(new URL('../../../drizzle', import.meta.url))
+const migrationsDir = fileURLToPath(
+  new URL('../../../drizzle', import.meta.url),
+)
 const BASE = 'https://gitlab.example.com'
 
 let db: RivjuDatabase
 let workDir: string
 /** Current GitLab version served by the fake fetch; tests can downgrade it. */
 let servedVersion: string = versionFixture.version
+let servedHeadSha: string = mergeRequestDetail.diff_refs.head_sha
 
 /**
  * A fixture-backed GitLab API: routes URL paths to the recorded JSON files so
@@ -62,9 +72,14 @@ function fixtureFetch(url: string | URL | Request): Response {
     })
 
   if (p === '/api/v4/user') return respond(userFixture)
-  if (p === '/api/v4/version') return respond({ ...versionFixture, version: servedVersion })
-  if (p === '/api/v4/personal_access_tokens/self') return respond(tokenSelfFixture)
-  if (p === '/api/v4/projects' && parsed.searchParams.get('membership') === 'true') {
+  if (p === '/api/v4/version')
+    return respond({ ...versionFixture, version: servedVersion })
+  if (p === '/api/v4/personal_access_tokens/self')
+    return respond(tokenSelfFixture)
+  if (
+    p === '/api/v4/projects' &&
+    parsed.searchParams.get('membership') === 'true'
+  ) {
     return respond(projectsPage1)
   }
   if (p === '/api/v4/projects/3201') return respond(projectsPage1[0])
@@ -78,12 +93,20 @@ function fixtureFetch(url: string | URL | Request): Response {
     }
     return respond([])
   }
-  if (p === '/api/v4/projects/3201/merge_requests/101') return respond(mergeRequestDetail)
-  if (p === '/api/v4/projects/3201/merge_requests/101/diffs') return respond(mergeRequestDiffs)
+  if (p === '/api/v4/projects/3201/merge_requests/101') {
+    return respond({
+      ...mergeRequestDetail,
+      diff_refs: { ...mergeRequestDetail.diff_refs, head_sha: servedHeadSha },
+    })
+  }
+  if (p === '/api/v4/projects/3201/merge_requests/101/diffs')
+    return respond(mergeRequestDiffs)
   return respond({ message: 'not found' }, 404)
 }
 
-async function seedInstance(label = 'Work GitLab'): Promise<ReturnType<typeof addInstance>> {
+async function seedInstance(
+  label = 'Work GitLab',
+): Promise<ReturnType<typeof addInstance>> {
   return addInstance({ label, baseUrl: BASE, token: 'glpat-test-token-123' })
 }
 
@@ -101,6 +124,7 @@ beforeEach(() => {
   db.delete(project).run()
   db.delete(gitlabInstance).run()
   servedVersion = versionFixture.version
+  servedHeadSha = mergeRequestDetail.diff_refs.head_sha
 })
 
 afterAll(() => {
@@ -140,7 +164,10 @@ describe('instance add validation flow', () => {
     const live = globalThis.fetch
     vi.stubGlobal(
       'fetch',
-      () => new Response(JSON.stringify({ message: '401 Unauthorized' }), { status: 401 }),
+      () =>
+        new Response(JSON.stringify({ message: '401 Unauthorized' }), {
+          status: 401,
+        }),
     )
     await expect(
       addInstance({ label: 'Bad', baseUrl: BASE, token: 'glpat-bad' }),
@@ -190,7 +217,8 @@ describe('delete cascades', () => {
         sourceBranch: 'fix/verify-anchors',
         targetBranch: 'main',
         state: 'opened',
-        webUrl: 'https://gitlab.example.com/acme/rivju-core/-/merge_requests/101',
+        webUrl:
+          'https://gitlab.example.com/acme/rivju-core/-/merge_requests/101',
       })
       .returning()
       .get()
@@ -230,7 +258,9 @@ describe('review queue (default filter across instances)', () => {
     // reviewer call returns 2 MRs; assignee call re-returns MR !101 → deduped
     expect(queue.items).toHaveLength(2)
     expect(queue.instanceErrors).toHaveLength(0)
-    expect(queue.items.map((i) => i.iid).sort((a, b) => a - b)).toEqual([57, 101])
+    expect(queue.items.map((i) => i.iid).sort((a, b) => a - b)).toEqual([
+      57, 101,
+    ])
     // most recently updated first
     expect(queue.items[0].iid).toBe(101)
     // repo path: from references.full, falling back to web_url parsing
@@ -243,17 +273,23 @@ describe('review queue (default filter across instances)', () => {
     const good = listInstances().find((i) => i.label === 'Good')
     const live = globalThis.fetch
     // Only the "Second" instance's requests fail (identified by its token header).
-    vi.stubGlobal('fetch', (url: string | URL | Request, init?: RequestInit) => {
-      const href = typeof url === 'string' ? url : url.toString()
-      const tokenHeader = new Headers(init?.headers).get('PRIVATE-TOKEN')
-      if (tokenHeader === 'glpat-second' && href.includes('/api/v4/merge_requests')) {
-        return new Response(JSON.stringify({ message: '500 whoops' }), {
-          status: 500,
-          headers: { 'Retry-After': '0' },
-        })
-      }
-      return fixtureFetch(url)
-    })
+    vi.stubGlobal(
+      'fetch',
+      (url: string | URL | Request, init?: RequestInit) => {
+        const href = typeof url === 'string' ? url : url.toString()
+        const tokenHeader = new Headers(init?.headers).get('PRIVATE-TOKEN')
+        if (
+          tokenHeader === 'glpat-second' &&
+          href.includes('/api/v4/merge_requests')
+        ) {
+          return new Response(JSON.stringify({ message: '500 whoops' }), {
+            status: 500,
+            headers: { 'Retry-After': '0' },
+          })
+        }
+        return fixtureFetch(url)
+      },
+    )
     // second instance still validates (/user + /version work), then breaks on the queue
     await addInstance({ label: 'Second', baseUrl: BASE, token: 'glpat-second' })
     const queue = await fetchReviewQueue()
@@ -264,7 +300,9 @@ describe('review queue (default filter across instances)', () => {
     expect(queue.items.some((i) => i.instanceId === good?.id)).toBe(true)
     expect(queue.instanceErrors.length).toBeGreaterThan(0)
     expect(
-      queue.items.every((i) => i.instanceId !== queue.instanceErrors[0]?.instanceId),
+      queue.items.every(
+        (i) => i.instanceId !== queue.instanceErrors[0]?.instanceId,
+      ),
     ).toBe(true)
   })
 })
@@ -281,21 +319,66 @@ describe('MR detail', () => {
       startSha: '1f2e3d4c5b6a79887766554433221100ffeeddcc',
     })
     expect(detail.files).toHaveLength(4)
-    expect(detail.files[0]).toMatchObject({ newPath: 'src/main/review/verify.ts' })
-    expect(detail.files[1]).toMatchObject({ newPath: 'src/main/review/anchor.ts', newFile: true })
-    expect(detail.files[2]).toMatchObject({ newPath: 'src/main/review/old.ts', deletedFile: true })
+    expect(detail.files[0]).toMatchObject({
+      newPath: 'src/main/review/verify.ts',
+    })
+    expect(detail.files[1]).toMatchObject({
+      newPath: 'src/main/review/anchor.ts',
+      newFile: true,
+    })
+    expect(detail.files[2]).toMatchObject({
+      newPath: 'src/main/review/old.ts',
+      deletedFile: true,
+    })
     expect(detail.files[3]).toMatchObject({
       newPath: 'src/main/review/renamed-core.ts',
       renamedFile: true,
     })
+    expect(detail.totalAdditions).toBe(5)
+    expect(detail.totalDeletions).toBe(2)
+    expect(detail.lineStatsComplete).toBe(true)
 
     const projectRows = db.select().from(project).all()
     expect(projectRows).toHaveLength(1)
     expect(projectRows[0].gitlabProjectId).toBe('3201')
     const mrRows = db.select().from(mergeRequest).all()
     expect(mrRows).toHaveLength(1)
-    expect(mrRows[0].lastSeenHeadSha).toBe('aa11bb22cc33dd44ee55ff66001122334455667')
+    expect(mrRows[0].lastSeenHeadSha).toBe(
+      'aa11bb22cc33dd44ee55ff66001122334455667',
+    )
     expect(mrRows[0].iid).toBe(101)
+  })
+
+  it('counts patch lines without counting file headers', () => {
+    expect(
+      countDiffLines(
+        '--- a/file.ts\n+++ b/file.ts\n@@ -1 +1,2 @@\n-old\n+new\n+another',
+      ),
+    ).toEqual({ additions: 2, deletions: 1 })
+  })
+
+  it('reports a newer head without accepting it until pull', async () => {
+    const instanceId = (await seedInstance()).id
+    await fetchMergeRequestDetail(instanceId, 3201, 101)
+    const acceptedHead = mergeRequestDetail.diff_refs.head_sha
+    servedHeadSha = 'bb22cc33dd44ee55ff6600112233445566778899'
+
+    const checked = await fetchMergeRequestDetail(instanceId, 3201, 101, {
+      acceptLatest: false,
+    })
+    expect(checked.hasNewVersion).toBe(true)
+    expect(checked.previousHeadSha).toBe(acceptedHead)
+    expect(db.select().from(mergeRequest).get()?.lastSeenHeadSha).toBe(
+      acceptedHead,
+    )
+
+    const pulled = await fetchMergeRequestDetail(instanceId, 3201, 101, {
+      acceptLatest: true,
+    })
+    expect(pulled.hasNewVersion).toBe(false)
+    expect(db.select().from(mergeRequest).get()?.lastSeenHeadSha).toBe(
+      servedHeadSha,
+    )
   })
 })
 
