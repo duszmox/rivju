@@ -4,9 +4,13 @@ import {
   describeEffectiveSelection,
   findProjectIdByCoordinates,
   getGlobalDefaults,
+  getTurnLimits,
   listProjectDefaults,
   setGlobalDefaults,
   setProjectDefaults,
+  setTurnLimits,
+  MAX_MAX_TURNS,
+  MIN_MAX_TURNS,
 } from '../../settings/service.ts'
 import { getUiTheme, setUiTheme } from '../../ui-theme.ts'
 import { publicProcedure, router } from '../base.ts'
@@ -33,6 +37,17 @@ export const settingsRouter = router({
       }),
     )
     .mutation(({ input }) => setProjectDefaults(input)),
+
+  turnLimits: publicProcedure.query(() => getTurnLimits()),
+
+  setTurnLimits: publicProcedure
+    .input(
+      z.object({
+        reviewMaxTurns: z.number().int().min(MIN_MAX_TURNS).max(MAX_MAX_TURNS),
+        verifyMaxTurns: z.number().int().min(MIN_MAX_TURNS).max(MAX_MAX_TURNS),
+      }),
+    )
+    .mutation(({ input }) => setTurnLimits(input)),
 
   /** Resolved global -> project pair, for the launch dialog's "Default" label. */
   effective: publicProcedure

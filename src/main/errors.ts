@@ -27,7 +27,7 @@ export function classifyFailure(raw: unknown): ClassifiedError {
       title: 'The agent hit its turn cap',
       message,
       recovery:
-        'Raise review.max_turns in Settings, narrow the file scope, or pick a smaller diff, then re-run. Findings already submitted were kept.',
+        'Use Continue to resume the same session with another turn allowance. You can also raise the turn limit in Settings for future runs. Findings already submitted were kept.',
     }
   }
   if (/exceeded its wall-clock timeout/i.test(message)) {

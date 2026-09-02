@@ -1,17 +1,17 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { EffortLevel, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { and, count, desc, eq, isNotNull } from 'drizzle-orm'
-import { appendFile, mkdir } from 'node:fs/promises'
+import { appendFile, mkdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { getPreflightState } from '../claude/preflight.ts'
 import { getDb } from '../db/client.ts'
-import { findingEvent, gitlabInstance, mergeRequest, project, run, setting, skill } from '../db/schema.ts'
+import { finding, findingEvent, gitlabInstance, mergeRequest, project, run, setting, skill } from '../db/schema.ts'
 import { emitRunEvent } from '../events/bus.ts'
 import { getClientForInstance } from '../gitlab/service.ts'
 import { resolvePaths } from '../paths.ts'
 import { computeDiff } from '../repo/diff.ts'
 import { ensureMirror, fetchMergeRequest } from '../repo/mirror.ts'
-import { withRunWorktree } from '../repo/worktree.ts'
+import { removeWorktree, withRunWorktree } from '../repo/worktree.ts'
 import { decryptToken } from '../security/tokens.ts'
 import { createReviewMcp } from './mcp.ts'
 import { canUseReviewTool } from './permissions.ts'
@@ -22,15 +22,22 @@ import { createVerifyMcp, reanchorOpenFindings } from './verify.ts'
 import { LiveTokenAccumulator, usageFromResult } from './usage.ts'
 import { resolveSkillContext } from '../skills/resolve.ts'
 import { ensureRunPluginDirs } from '../skills/service.ts'
-import { parseEffort, resolveModelSelection } from '../settings/service.ts'
+import {
+  DEFAULT_REVIEW_MAX_TURNS,
+  DEFAULT_VERIFY_MAX_TURNS,
+  MAX_MAX_TURNS,
+  MIN_MAX_TURNS,
+  REVIEW_MAX_TURNS_KEY,
+  VERIFY_MAX_TURNS_KEY,
+  parseEffort,
+  resolveModelSelection,
+} from '../settings/service.ts'
 import type { RivjuDatabase } from '../db/client.ts'
 import type { RunKind, RunRow, RunUsage } from '../db/schema.ts'
 
 const DEFAULT_CONCURRENCY = 2
 const MAX_CONCURRENCY = 5
-const DEFAULT_MAX_TURNS = 40
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
-const VERIFY_DEFAULT_MAX_TURNS = 15
 const VERIFY_DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
 const MAX_TIMEOUT_MS = 2 * 60 * 60 * 1000
 
@@ -57,6 +64,7 @@ type QueuedReview = StartReviewInput & {
   kind: RunKind
   sourceBranch: string
   targetBranch: string
+  continuation?: boolean
 }
 type ReviewQuery = ReturnType<typeof query>
 type ReviewContext = Awaited<ReturnType<typeof lookupContext>>
@@ -177,6 +185,52 @@ export function cancelReview(runId: string): boolean {
   return true
 }
 
+/** Resume a failed max-turns session with another configured turn allowance. */
+export function continueReview(runId: string): RunRow {
+  if (disposing) throw new Error('rivju is shutting down')
+  if (pending.some((item) => item.runId === runId) || active.has(runId)) {
+    throw new Error('This run is already queued or running')
+  }
+  const db = getDb()
+  const context = db
+    .select({ run, instanceId: project.instanceId, gitlabProjectId: project.gitlabProjectId, mr: mergeRequest })
+    .from(run)
+    .innerJoin(mergeRequest, eq(mergeRequest.id, run.mergeRequestId))
+    .innerJoin(project, eq(project.id, mergeRequest.projectId))
+    .where(eq(run.id, runId))
+    .get()
+  if (!context) throw new Error('Run not found')
+  if (!isContinuableRun(context.run)) {
+    throw new Error('Only a run that stopped at its max-turns cap can be continued')
+  }
+  if (!context.run.baseSha || !context.run.headSha || !context.run.worktreePath) {
+    throw new Error('The retained checkout for this run is unavailable')
+  }
+
+  const row = db
+    .update(run)
+    .set({ status: 'queued', error: null, endedAt: null })
+    .where(eq(run.id, runId))
+    .returning()
+    .get()
+  pending.push({
+    runId,
+    kind: row.kind,
+    continuation: true,
+    instanceId: context.instanceId,
+    gitlabProjectId: Number(context.gitlabProjectId),
+    iid: context.mr.iid,
+    baseSha: context.run.baseSha,
+    headSha: context.run.headSha,
+    labels: [],
+    sourceBranch: context.mr.sourceBranch,
+    targetBranch: context.mr.targetBranch,
+  })
+  emitQueuePositions()
+  queueMicrotask(pumpQueue)
+  return row
+}
+
 /** Abort/close every SDK process synchronously enough for Electron before-quit. */
 export function disposeReviewRuns(): void {
   disposing = true
@@ -215,15 +269,19 @@ export function listRuns() {
     .innerJoin(mergeRequest, eq(mergeRequest.id, run.mergeRequestId))
     .innerJoin(project, eq(project.id, mergeRequest.projectId))
     .all()
-    .map((item) => ({
-      ...item.run,
-      instanceId: item.instanceId,
-      gitlabProjectId: Number(item.gitlabProjectId),
-      iid: item.iid,
-      sourceBranch: item.sourceBranch,
-      targetBranch: item.targetBranch,
-      findingCount: submitted.get(item.run.id) ?? 0,
-    }))
+    .map((item) => {
+      const { sessionId: _sessionId, ...runRow } = item.run
+      return {
+        ...runRow,
+        instanceId: item.instanceId,
+        gitlabProjectId: Number(item.gitlabProjectId),
+        iid: item.iid,
+        sourceBranch: item.sourceBranch,
+        targetBranch: item.targetBranch,
+        findingCount: submitted.get(item.run.id) ?? 0,
+        canContinue: isContinuableRun(item.run),
+      }
+    })
     .sort((a, b) =>
       (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),
     )
@@ -300,7 +358,10 @@ async function executeReview(item: QueuedReview, activeReview: ActiveReview): Pr
   const context = lookupContext(item)
   const row = db.select().from(run).where(eq(run.id, item.runId)).get()
   if (!row || row.status === 'cancelled') return
-  db.update(run).set({ status: 'running', startedAt: new Date() }).where(eq(run.id, item.runId)).run()
+  db.update(run)
+    .set({ status: 'running', startedAt: row.startedAt ?? new Date() })
+    .where(eq(run.id, item.runId))
+    .run()
   emitRunEvent({
     type: 'run:started', runId: item.runId, at: Date.now(), model: row.model, effort: row.effort,
   })
@@ -309,6 +370,10 @@ async function executeReview(item: QueuedReview, activeReview: ActiveReview): Pr
   const log = new JsonlWriter(row.logPath ?? path.join(paths.logsDir, `${item.runId}.jsonl`))
 
   try {
+    if (item.continuation) {
+      await runContinuationFlow({ item, context, row, activeReview, log })
+      return
+    }
     emitPhase(item.runId, 'preparing', 'Fetching merge request and creating detached checkout')
     const token = decryptToken(context.instance.tokenCiphertext)
     const mirrorPath = await ensureMirror({
@@ -356,11 +421,121 @@ async function executeReview(item: QueuedReview, activeReview: ActiveReview): Pr
         ? `${base}\nAdditionally, the run log could not be written: ${logFailure.message}`
         : base
     db.update(run).set({ status: 'failed', error: message, endedAt: new Date() }).where(eq(run.id, item.runId)).run()
-    emitRunEvent({ type: 'run:failed', runId: item.runId, at: Date.now(), error: message })
+    const failed = db.select().from(run).where(eq(run.id, item.runId)).get()
+    emitRunEvent({
+      type: 'run:failed',
+      runId: item.runId,
+      at: Date.now(),
+      error: message,
+      canContinue: failed ? isContinuableRun(failed) : false,
+    })
   } finally {
     if (activeReview.timeout) clearTimeout(activeReview.timeout)
     activeReview.session?.close()
     await log.close()
+  }
+}
+
+type ContinuationFlow = Omit<ReviewFlow, 'mirrorPath' | 'worktreePath'>
+
+async function runContinuationFlow(flow: ContinuationFlow): Promise<void> {
+  const { item, context, row, activeReview, log } = flow
+  const worktreePath = row.worktreePath
+  if (!row.sessionId || !worktreePath) {
+    throw new Error('The Claude session or retained checkout for this run is unavailable')
+  }
+  const checkout = await stat(worktreePath).catch(() => null)
+  if (!checkout?.isDirectory()) throw new Error('The retained checkout for this run is unavailable')
+
+  const db = getDb()
+  const completion = { finished: false }
+  const isVerify = item.kind === 'verify'
+  const targetFindingIds = isVerify
+    ? new Set(
+        db
+          .select({ id: finding.id })
+          .from(finding)
+          .where(and(eq(finding.mergeRequestId, context.mr.id), eq(finding.lifecycle, 'open')))
+          .all()
+          .map((entry) => entry.id),
+      )
+    : null
+  const mcp = isVerify
+    ? createVerifyMcp({
+        db,
+        runId: item.runId,
+        mergeRequestId: context.mr.id,
+        headSha: item.headSha,
+        targetFindingIds: targetFindingIds ?? new Set(),
+        onFinished: () => { completion.finished = true },
+      })
+    : createReviewMcp({
+        db,
+        runId: item.runId,
+        mergeRequestId: context.mr.id,
+        headSha: item.headSha,
+        worktreePath,
+        onFinished: () => { completion.finished = true },
+      })
+
+  const preflight = requirePreflight()
+  const skillContext = isVerify ? null : resolveRunSkills(context.project)
+  if (skillContext) {
+    await ensureRunPluginDirs(skillContext.projectPluginDir ? projectRefOf(context.project) : null)
+  }
+  emitPhase(item.runId, 'reviewing', 'Continuing after the turn cap')
+  log.write({
+    type: 'rivju_run_continue',
+    at: Date.now(),
+    runId: item.runId,
+    sessionId: row.sessionId,
+  })
+  const session = query({
+    prompt: 'Continue from where you stopped. Finish the remaining work and call finish_review when complete.',
+    options: {
+      cwd: worktreePath,
+      pathToClaudeCodeExecutable: preflight.claudePath,
+      settingSources: [],
+      ...(skillContext ? { plugins: skillContext.plugins, skills: skillContext.skills } : { skills: [] }),
+      mcpServers: { rivju: mcp },
+      strictMcpConfig: true,
+      tools: isVerify ? ['Read', 'Grep', 'Glob', 'Bash'] : ['Read', 'Grep', 'Glob', 'Bash', 'Skill'],
+      allowedTools: isVerify
+        ? ['Read', 'Grep', 'Glob', 'Bash', 'mcp__rivju__report_verification', 'mcp__rivju__finish_review']
+        : ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'mcp__rivju__submit_finding', 'mcp__rivju__finish_review'],
+      disallowedTools: ['Write', 'Edit', 'WebFetch'],
+      canUseTool: canUseReviewTool,
+      sandbox: reviewSandbox(),
+      model: row.model ?? undefined,
+      effort: parseEffort(row.effort),
+      maxTurns: maxTurnsFor(item.kind),
+      resume: row.sessionId,
+      abortController: activeReview.abort,
+      includePartialMessages: true,
+      systemPrompt: isVerify ? VERIFY_SYSTEM_PROMPT : REVIEW_SYSTEM_PROMPT,
+      spawnClaudeCodeProcess: spawnReviewProcessFactory(activeReview, log),
+    },
+  })
+  activeReview.session = session
+  armTimeout(
+    activeReview,
+    isVerify ? 'verify.timeout_ms' : 'review.timeout_ms',
+    isVerify ? VERIFY_DEFAULT_TIMEOUT_MS : DEFAULT_TIMEOUT_MS,
+  )
+  const usage = await consumeSession(item, session, db, log, row.usage ?? undefined)
+  if (!completion.finished) {
+    throw new Error(`${isVerify ? 'Verification agent' : 'Agent'} ended without calling finish_review`)
+  }
+  ensureNotAborted(activeReview)
+  emitPhase(item.runId, 'summarizing', `Saving ${isVerify ? 'verification' : 'review'} results`)
+  const findingCount = isVerify ? (targetFindingIds?.size ?? 0) : submittedFindingCount(item.runId)
+  completeRun(item.runId, usage, findingCount)
+  if (context.project.mirrorPath) {
+    await removeWorktree({
+      mirrorPath: context.project.mirrorPath,
+      worktreesDir: resolvePaths().worktreesDir,
+      runId: item.runId,
+    })
   }
 }
 
@@ -451,7 +626,7 @@ async function runFullFlow(flow: ReviewFlow): Promise<void> {
       sandbox: reviewSandbox(),
       model: row.model ?? undefined,
       effort: parseEffort(row.effort),
-      maxTurns: settingNumber('review.max_turns', DEFAULT_MAX_TURNS, 1, 200),
+      maxTurns: maxTurnsFor('full'),
       abortController: activeReview.abort,
       includePartialMessages: true,
       systemPrompt: REVIEW_SYSTEM_PROMPT,
@@ -563,7 +738,7 @@ async function runVerifyFlow(flow: ReviewFlow): Promise<void> {
       sandbox: reviewSandbox(),
       model: row.model ?? undefined,
       effort: parseEffort(row.effort),
-      maxTurns: settingNumber('verify.max_turns', VERIFY_DEFAULT_MAX_TURNS, 1, 200),
+      maxTurns: maxTurnsFor('verify'),
       abortController: activeReview.abort,
       includePartialMessages: true,
       systemPrompt: VERIFY_SYSTEM_PROMPT,
@@ -588,7 +763,7 @@ function requirePreflight() {
 function reviewSandbox() {
   return {
     enabled: true,
-    failIfUnavailable: true,
+    failIfUnavailable: false,
     autoAllowBashIfSandboxed: false,
     allowUnsandboxedCommands: false,
     network: { allowedDomains: [], strictAllowlist: true },
@@ -609,11 +784,16 @@ async function consumeSession(
   session: ReviewQuery,
   db: RivjuDatabase,
   log: JsonlWriter,
+  previousUsage?: RunUsage,
 ): Promise<RunUsage> {
-  let usage: RunUsage = { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+  const baseUsage = previousUsage ?? { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+  let usage: RunUsage = baseUsage
   const liveTokens = new LiveTokenAccumulator()
   for await (const message of session) {
     log.write(message)
+    if ('session_id' in message && message.session_id) {
+      db.update(run).set({ sessionId: message.session_id }).where(eq(run.id, item.runId)).run()
+    }
     emitToolUse(item.runId, message)
     if (message.type === 'assistant') {
       const tokens = liveTokens.update(
@@ -622,19 +802,31 @@ async function consumeSession(
         message.message.usage.output_tokens,
       )
       if (tokens) {
-        usage = { ...usage, ...tokens }
+        usage = addUsage(baseUsage, { ...tokens, costUsd: 0 })
         db.update(run).set({ usage }).where(eq(run.id, item.runId)).run()
         emitUsage(item.runId, usage)
       }
     }
     if (message.type === 'result') {
-      usage = usageFromResult(message)
+      usage = addUsage(baseUsage, usageFromResult(message))
       db.update(run).set({ usage }).where(eq(run.id, item.runId)).run()
       emitUsage(item.runId, usage)
       if (message.is_error) throw resultError(message)
     }
   }
   return usage
+}
+
+function addUsage(previous: RunUsage, current: RunUsage): RunUsage {
+  return {
+    inputTokens: previous.inputTokens + current.inputTokens,
+    outputTokens: previous.outputTokens + current.outputTokens,
+    cacheReadInputTokens:
+      (previous.cacheReadInputTokens ?? 0) + (current.cacheReadInputTokens ?? 0),
+    cacheCreationInputTokens:
+      (previous.cacheCreationInputTokens ?? 0) + (current.cacheCreationInputTokens ?? 0),
+    costUsd: (previous.costUsd ?? 0) + (current.costUsd ?? 0),
+  }
 }
 
 function armTimeout(activeReview: ActiveReview, settingKey: string, fallback: number): void {
@@ -731,6 +923,38 @@ function concurrencyLimit(): number {
   return settingNumber('review.max_concurrent_runs', DEFAULT_CONCURRENCY, 1, MAX_CONCURRENCY)
 }
 
+function maxTurnsFor(kind: RunKind): number {
+  return kind === 'verify'
+    ? settingNumber(
+        VERIFY_MAX_TURNS_KEY,
+        DEFAULT_VERIFY_MAX_TURNS,
+        MIN_MAX_TURNS,
+        MAX_MAX_TURNS,
+      )
+    : settingNumber(
+        REVIEW_MAX_TURNS_KEY,
+        DEFAULT_REVIEW_MAX_TURNS,
+        MIN_MAX_TURNS,
+        MAX_MAX_TURNS,
+      )
+}
+
+function isMaxTurnsError(value: string | null): boolean {
+  return Boolean(value && /max-turns cap|maximum number of turns|error_max_turns/i.test(value))
+}
+
+function isContinuableRun(row: RunRow): boolean {
+  return row.status === 'failed' && Boolean(row.sessionId) && isMaxTurnsError(row.error)
+}
+
+function submittedFindingCount(runId: string): number {
+  return getDb()
+    .select({ total: count() })
+    .from(findingEvent)
+    .where(and(eq(findingEvent.runId, runId), eq(findingEvent.type, 'submitted')))
+    .get()?.total ?? 0
+}
+
 function isSha(value: string): boolean {
   return /^[0-9a-f]{40,64}$/i.test(value)
 }
@@ -809,7 +1033,14 @@ function failRunSafely(runId: string, error: unknown): void {
     if (!row || row.status === 'cancelled' || row.status === 'failed') return
     const message = error instanceof Error ? error.message : String(error)
     db.update(run).set({ status: 'failed', error: message, endedAt: new Date() }).where(eq(run.id, runId)).run()
-    emitRunEvent({ type: 'run:failed', runId, at: Date.now(), error: message })
+    const failed = db.select().from(run).where(eq(run.id, runId)).get()
+    emitRunEvent({
+      type: 'run:failed',
+      runId,
+      at: Date.now(),
+      error: message,
+      canContinue: failed ? isContinuableRun(failed) : false,
+    })
   } catch (secondary) {
     console.error(`[rivju] failed to finalize review run ${runId}`, secondary)
   }

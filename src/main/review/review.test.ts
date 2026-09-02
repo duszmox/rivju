@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { eq } from 'drizzle-orm'
 import { closeDatabase, openDatabase } from '../db/client.ts'
 import type { RivjuDatabase } from '../db/client.ts'
 import { applyMigrations } from '../db/migrate.ts'
@@ -187,6 +188,22 @@ describe('run list navigation metadata', () => {
         targetBranch: 'main',
       },
     ])
+  })
+
+  it('marks only resumable max-turn failures as continuable', () => {
+    db.update(run)
+      .set({
+        status: 'failed',
+        sessionId: crypto.randomUUID(),
+        error: 'The agent hit the max-turns cap after 40 turns without calling finish_review',
+      })
+      .where(eq(run.id, runId))
+      .run()
+
+    expect(listRuns()).toMatchObject([{ id: runId, canContinue: true }])
+
+    db.update(run).set({ error: 'Network connection failed' }).where(eq(run.id, runId)).run()
+    expect(listRuns()).toMatchObject([{ id: runId, canContinue: false }])
   })
 })
 

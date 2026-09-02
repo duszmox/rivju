@@ -61,7 +61,7 @@ export interface ReanchorView {
 
 export async function getReview(input: ReviewCoordinates & { runId?: string }) {
   const context = reviewContext(input)
-  const runs = getDb()
+  const runRows = getDb()
     .select()
     .from(run)
     .where(eq(run.mergeRequestId, context.mr.id))
@@ -69,6 +69,16 @@ export async function getReview(input: ReviewCoordinates & { runId?: string }) {
     .sort(
       (left, right) => timeValue(right.startedAt) - timeValue(left.startedAt),
     )
+  const runs = runRows.map((row) => {
+    const { sessionId: _sessionId, ...safeRow } = row
+    return {
+      ...safeRow,
+      canContinue:
+        row.status === 'failed' &&
+        Boolean(row.sessionId) &&
+        Boolean(row.error && /max-turns cap|maximum number of turns|error_max_turns/i.test(row.error)),
+    }
+  })
   const selectedRun = input.runId
     ? runs.find((item) => item.id === input.runId)
     : (runs.find((item) => item.status === 'done') ?? runs[0])

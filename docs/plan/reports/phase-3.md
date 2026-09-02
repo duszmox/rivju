@@ -1,5 +1,23 @@
 # Phase 3 report — review engine
 
+## Maintenance note: configurable turn caps and continuation
+
+- Settings now exposes separate maximum turn counts for full reviews and
+  verification runs. Both accept 1 to 200 turns and retain the existing defaults
+  of 40 and 15.
+- A run that reaches its turn cap stores its Claude session ID and keeps its
+  checkout. The Continue action resumes that session with another configured
+  allowance while preserving findings and cumulative usage on the same run.
+- Migration `0003_large_maximus.sql` adds the resumable session ID to `run`.
+
+## Maintenance note — unavailable OS sandbox
+
+- Review and verify runs now fall back to the existing read-only tool policy
+  when Claude Code's OS sandbox is unavailable. This keeps runs working in
+  Windows sessions where the sandbox feature gate is off.
+- The sandbox remains enabled and denies network access whenever the host can
+  provide it.
+
 ## Maintenance note — numeric setting defaults
 
 - Fixed absent or blank numeric settings being coerced to zero before clamping.

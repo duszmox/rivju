@@ -107,6 +107,8 @@ export const run = sqliteTable('run', {
   effort: text('effort'),
   /** JSON array of enabled skill names (SDK `skills` context filter). */
   enabledSkills: text('enabled_skills', { mode: 'json' }).$type<string[]>(),
+  /** Claude session used to resume a run that stopped at its turn cap. */
+  sessionId: text('session_id'),
   worktreePath: text('worktree_path'),
   logPath: text('log_path'),
   usage: text('usage', { mode: 'json' }).$type<RunUsage>(),

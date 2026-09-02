@@ -23,6 +23,7 @@ import {
   ListChecks,
   LoaderCircle,
   MessageSquareText,
+  Play,
   X,
 } from 'lucide-react'
 import {
@@ -413,6 +414,15 @@ function RunOutcome({
   run: ReviewRun
   findingCount: number
 }) {
+  const trpc = useTrpc()
+  const queryClient = useQueryClient()
+  const continueRun = useMutation(
+    trpc.runs.continue.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.reviews.detail.pathKey() })
+      },
+    }),
+  )
   if (run.status === 'queued' || run.status === 'running')
     return (
       <div className="mt-4 rounded-xl border border-[var(--chip-line)] bg-[var(--hero-a)] px-4 py-3 text-sm text-[var(--lagoon-deep)]">
@@ -432,6 +442,23 @@ function RunOutcome({
             ?? 'The run was interrupted: rivju exited while the run was still in progress.'
           }
         />
+        {run.canContinue ? (
+          <div className="mt-3 flex items-center gap-3">
+            <Button
+              disabled={continueRun.isPending}
+              onClick={() => continueRun.mutate({ runId: run.id })}
+            >
+              <Play className="size-4" />
+              {continueRun.isPending ? 'Continuing…' : 'Continue review'}
+            </Button>
+            <p className="text-xs text-(--sea-ink-soft)">
+              Resumes the same Claude session with another turn allowance.
+            </p>
+          </div>
+        ) : null}
+        {continueRun.error ? (
+          <p className="mt-2 text-xs text-destructive">{continueRun.error.message}</p>
+        ) : null}
       </div>
     )
   if (run.kind === 'verify') return null

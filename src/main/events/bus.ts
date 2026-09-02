@@ -40,7 +40,7 @@ export type RunEvent =
     }
   | { type: 'run:done'; runId: string; at: number; findingCount: number }
   | { type: 'run:finding'; runId: string; at: number; finding: FindingRow }
-  | { type: 'run:failed'; runId: string; at: number; error: string }
+  | { type: 'run:failed'; runId: string; at: number; error: string; canContinue?: boolean }
   | { type: 'run:cancelled'; runId: string; at: number }
 
 type Listener = (event: RunEvent) => void

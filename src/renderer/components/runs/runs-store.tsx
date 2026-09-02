@@ -21,6 +21,7 @@ export interface RunSummary {
   iid: number | null
   sourceBranch: string | null
   targetBranch: string | null
+  canContinue: boolean
 }
 
 type RunsMap = Record<string, RunSummary>
@@ -44,6 +45,7 @@ function emptySummary(runId: string): RunSummary {
     iid: null,
     sourceBranch: null,
     targetBranch: null,
+    canContinue: false,
   }
 }
 
@@ -62,6 +64,7 @@ function applyEvent(prev: RunsMap, event: RunEvent): RunsMap {
           iid: event.iid,
           sourceBranch: event.sourceBranch,
           targetBranch: event.targetBranch,
+          canContinue: false,
         },
       }
     case 'run:started':
@@ -88,7 +91,16 @@ function applyEvent(prev: RunsMap, event: RunEvent): RunsMap {
     case 'run:finding':
       return { ...prev, [event.runId]: { ...run, findingCount: (run.findingCount ?? 0) + 1 } }
     case 'run:failed':
-      return { ...prev, [event.runId]: { ...run, status: 'failed', message: event.error, endedAt: event.at } }
+      return {
+        ...prev,
+        [event.runId]: {
+          ...run,
+          status: 'failed',
+          message: event.error,
+          endedAt: event.at,
+          canContinue: event.canContinue ?? false,
+        },
+      }
     case 'run:cancelled':
       return { ...prev, [event.runId]: { ...run, status: 'cancelled', endedAt: event.at } }
   }
@@ -140,6 +152,7 @@ export function RunsProvider({ children }: { children: ReactNode }) {
             iid: row.iid,
             sourceBranch: row.sourceBranch,
             targetBranch: row.targetBranch,
+            canContinue: row.canContinue,
           }
         }
         return hydrated

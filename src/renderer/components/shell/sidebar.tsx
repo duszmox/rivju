@@ -6,6 +6,7 @@ import {
   KeyRound,
   Monitor,
   Moon,
+  Play,
   Settings,
   Sparkles,
   Square,
@@ -62,6 +63,7 @@ export function Sidebar() {
   const { runs, connected } = useRuns()
   const preflight = useQuery(trpc.system.preflight.queryOptions(undefined))
   const cancel = useMutation(trpc.runs.cancel.mutationOptions())
+  const continueRun = useMutation(trpc.runs.continue.mutationOptions())
   const theme = useQuery(trpc.settings.uiTheme.queryOptions())
   const setTheme = useMutation(trpc.settings.setUiTheme.mutationOptions())
   const recentProjects = useQuery(
@@ -293,6 +295,18 @@ export function Sidebar() {
                     <Square className="size-3" />
                   </Button>
                 )}
+                {run.canContinue ? (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="absolute right-2 top-2 h-7 gap-1 px-2 text-[10px]"
+                    disabled={continueRun.isPending}
+                    onClick={() => continueRun.mutate({ runId: run.runId })}
+                    title="Continue this run with another turn allowance"
+                  >
+                    <Play className="size-3" /> Continue
+                  </Button>
+                ) : null}
               </div>
             )
           })

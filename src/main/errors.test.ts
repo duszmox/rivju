@@ -12,7 +12,7 @@ describe('failure classification', () => {
       name: 'max turns',
       raw: 'The agent hit the max-turns cap after 40 turns without calling finish_review',
       title: /turn cap/,
-      recovery: /review\.max_turns/,
+      recovery: /Continue|turn limit in Settings/,
     },
     {
       name: 'wall-clock timeout',

@@ -1,0 +1,1 @@
+ALTER TABLE `run` ADD `session_id` text;

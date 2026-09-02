@@ -19,6 +19,12 @@ import type { ProjectRow } from '../db/schema.ts'
 export const DEFAULT_MODEL_KEY = 'review.default_model'
 export const DEFAULT_EFFORT_KEY = 'review.default_effort'
 export const UI_THEME_KEY = 'ui.theme'
+export const REVIEW_MAX_TURNS_KEY = 'review.max_turns'
+export const VERIFY_MAX_TURNS_KEY = 'verify.max_turns'
+export const DEFAULT_REVIEW_MAX_TURNS = 40
+export const DEFAULT_VERIFY_MAX_TURNS = 15
+export const MIN_MAX_TURNS = 1
+export const MAX_MAX_TURNS = 200
 
 export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 
@@ -46,6 +52,39 @@ export function writeSetting(key: string, value: string | null): void {
     .values({ key, value })
     .onConflictDoUpdate({ target: setting.key, set: { value } })
     .run()
+}
+
+function boundedInteger(value: string | null, fallback: number): number {
+  if (value === null) return fallback
+  const parsed = Number(value)
+  return Number.isFinite(parsed)
+    ? Math.max(MIN_MAX_TURNS, Math.min(MAX_MAX_TURNS, Math.floor(parsed)))
+    : fallback
+}
+
+export interface TurnLimits {
+  reviewMaxTurns: number
+  verifyMaxTurns: number
+  min: number
+  max: number
+}
+
+export function getTurnLimits(): TurnLimits {
+  return {
+    reviewMaxTurns: boundedInteger(readSetting(REVIEW_MAX_TURNS_KEY), DEFAULT_REVIEW_MAX_TURNS),
+    verifyMaxTurns: boundedInteger(readSetting(VERIFY_MAX_TURNS_KEY), DEFAULT_VERIFY_MAX_TURNS),
+    min: MIN_MAX_TURNS,
+    max: MAX_MAX_TURNS,
+  }
+}
+
+export function setTurnLimits(input: {
+  reviewMaxTurns: number
+  verifyMaxTurns: number
+}): TurnLimits {
+  writeSetting(REVIEW_MAX_TURNS_KEY, String(input.reviewMaxTurns))
+  writeSetting(VERIFY_MAX_TURNS_KEY, String(input.verifyMaxTurns))
+  return getTurnLimits()
 }
 
 export function modelCatalog(): ModelInfo[] {

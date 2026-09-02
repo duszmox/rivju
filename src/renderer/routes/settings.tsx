@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
+import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import {
   Select,
@@ -42,6 +44,8 @@ function Settings() {
   const setProject = useMutation(trpc.settings.setProjectDefaults.mutationOptions())
   const theme = useQuery(trpc.settings.uiTheme.queryOptions())
   const setTheme = useMutation(trpc.settings.setUiTheme.mutationOptions())
+  const turnLimits = useQuery(trpc.settings.turnLimits.queryOptions())
+  const setTurnLimits = useMutation(trpc.settings.setTurnLimits.mutationOptions())
 
   const refresh = (): void => {
     void queryClient.invalidateQueries({ queryKey: trpc.settings.defaults.pathKey() })
@@ -53,7 +57,7 @@ function Settings() {
   const models = defaults.data?.models ?? []
   const globalModel = defaults.data?.model ?? null
   const globalTarget = findModel(models, globalModel ?? defaults.data?.catalogDefault ?? null)
-  const error = setDefaults.error ?? setProject.error
+  const error = setDefaults.error ?? setProject.error ?? setTurnLimits.error
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-10">
@@ -150,6 +154,22 @@ function Settings() {
         </div>
       </section>
 
+      {turnLimits.data ? (
+        <TurnLimitsForm
+          key={`${turnLimits.data.reviewMaxTurns}-${turnLimits.data.verifyMaxTurns}`}
+          limits={turnLimits.data}
+          saving={setTurnLimits.isPending}
+          onSave={(values) =>
+            setTurnLimits.mutate(values, {
+              onSuccess: () =>
+                void queryClient.invalidateQueries({
+                  queryKey: trpc.settings.turnLimits.pathKey(),
+                }),
+            })
+          }
+        />
+      ) : null}
+
       <section className="mt-8">
         <h2 className="font-semibold text-(--sea-ink)">Per-project overrides</h2>
         <p className="mt-1 text-sm text-(--sea-ink-soft)">
@@ -222,6 +242,73 @@ function Settings() {
         </div>
       </section>
     </div>
+  )
+}
+
+function TurnLimitsForm({
+  limits,
+  saving,
+  onSave,
+}: {
+  limits: RouterOutput['settings']['turnLimits']
+  saving: boolean
+  onSave: (values: { reviewMaxTurns: number; verifyMaxTurns: number }) => void
+}) {
+  const [reviewMaxTurns, setReviewMaxTurns] = useState(String(limits.reviewMaxTurns))
+  const [verifyMaxTurns, setVerifyMaxTurns] = useState(String(limits.verifyMaxTurns))
+  const parsedReview = Number(reviewMaxTurns)
+  const parsedVerify = Number(verifyMaxTurns)
+  const valid = [parsedReview, parsedVerify].every(
+    (value) => Number.isInteger(value) && value >= limits.min && value <= limits.max,
+  )
+
+  return (
+    <section className="island-shell mt-8 rounded-2xl p-6">
+      <h2 className="font-semibold text-(--sea-ink)">Turn limits</h2>
+      <p className="mt-1 text-sm text-(--sea-ink-soft)">
+        Each continuation gets the same allowance. A stopped run keeps its findings and can resume
+        from the run screen.
+      </p>
+      <div className="mt-4 flex flex-wrap items-end gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="review-max-turns">Full review</Label>
+          <Input
+            id="review-max-turns"
+            type="number"
+            min={limits.min}
+            max={limits.max}
+            value={reviewMaxTurns}
+            onChange={(event) => setReviewMaxTurns(event.target.value)}
+            className="w-32"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="verify-max-turns">Verification</Label>
+          <Input
+            id="verify-max-turns"
+            type="number"
+            min={limits.min}
+            max={limits.max}
+            value={verifyMaxTurns}
+            onChange={(event) => setVerifyMaxTurns(event.target.value)}
+            className="w-32"
+          />
+        </div>
+        <Button
+          disabled={!valid || saving}
+          onClick={() =>
+            onSave({ reviewMaxTurns: parsedReview, verifyMaxTurns: parsedVerify })
+          }
+        >
+          {saving ? 'Saving…' : 'Save turn limits'}
+        </Button>
+      </div>
+      {!valid ? (
+        <p className="mt-2 text-xs text-destructive">
+          Enter whole numbers from {limits.min} to {limits.max}.
+        </p>
+      ) : null}
+    </section>
   )
 }
 
