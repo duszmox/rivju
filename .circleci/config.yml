@@ -93,6 +93,13 @@ jobs:
       - run: npm run build
       - run: npm version "$version" --no-git-tag-version
       - run:
+          name: Reinstall dependencies for << parameters.arch >>
+          # The runner is arm64, so the first install resolved arm64-only
+          # optional dependencies. Packaged native binaries must match the
+          # target architecture, and the build output in out/ is already
+          # architecture independent.
+          command: npm ci --ignore-scripts --os=darwin --cpu=<< parameters.arch >>
+      - run:
           name: Build, sign, and notarize
           no_output_timeout: 40m
           command: |
@@ -106,6 +113,13 @@ jobs:
             export APPLE_API_KEY="$key_path"
             export RIVJU_REQUIRE_SIGNING=1
             npx electron-builder --config electron-builder.config.cjs --mac dmg zip --<< parameters.arch >> --publish never
+      - run:
+          name: Verify << parameters.arch >> binaries
+          command: |
+            set -euo pipefail
+            app="$(find release -maxdepth 2 -name '*.app' -print -quit)"
+            test -n "$app"
+            node scripts/verify-mac-arch.mjs "$app" << parameters.arch >>
       - run:
           name: Stage macOS artifacts
           command: |

@@ -53,6 +53,21 @@ job obtains a short-lived npm token from CircleCI OIDC; do not add a long-lived
 CircleCI trusted publishing requires Node 22.14 or newer and npm 11.5.1 or
 newer. The workflow installs the current npm 11 before publishing.
 
+## macOS signing details
+
+The app runs under the hardened runtime with entitlements from
+`build/entitlements.mac.plist`. Nested executables, including the bundled
+Claude Agent SDK `claude` binary that electron-builder re-signs with this
+team's Developer ID, use `build/entitlements.mac.inherit.plist`, which adds
+Apple Events access.
+
+Both macOS jobs run on arm64 runners, so each reinstalls dependencies with
+`--os=darwin --cpu=<arch>` before packaging. Without that, the x64 build
+bundles arm64 native binaries; it signs and notarizes normally and fails only
+when an Intel user launches it. `scripts/verify-mac-arch.mjs` asserts the
+architecture of every Mach-O file in the packaged app and fails the job before
+anything is staged.
+
 ## First npm publication
 
 npm cannot attach a trusted publisher until the package exists. Bootstrap it

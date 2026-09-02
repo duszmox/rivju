@@ -79,6 +79,8 @@ module.exports = {
     category: 'public.app-category.developer-tools',
     target: ['dmg', 'zip'],
     hardenedRuntime: true,
+    entitlements: 'build/entitlements.mac.plist',
+    entitlementsInherit: 'build/entitlements.mac.inherit.plist',
     identity: signingRequired ? undefined : null,
     notarize: signingRequired,
   },
