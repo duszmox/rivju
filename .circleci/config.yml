@@ -94,15 +94,18 @@ jobs:
       - run: npm version "$version" --no-git-tag-version
       - run:
           name: Build, sign, and notarize
+          no_output_timeout: 40m
           command: |
             set -euo pipefail
             key_path="$TMPDIR/AuthKey_${APPLE_API_KEY_ID}.p8"
-            printf '%s' "$APPLE_API_KEY" > "$key_path"
+            umask 077
+            printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$key_path"
             chmod 600 "$key_path"
+            openssl pkey -in "$key_path" -noout
             trap 'rm -f "$key_path"' EXIT
             export APPLE_API_KEY="$key_path"
             export RIVJU_REQUIRE_SIGNING=1
-            npx electron-builder --config electron-builder.config.cjs --mac dmg zip --<< parameters.arch >>
+            npx electron-builder --config electron-builder.config.cjs --mac dmg zip --<< parameters.arch >> --publish never
       - run:
           name: Stage macOS artifacts
           command: |
@@ -130,7 +133,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm version "$version" --no-git-tag-version
-      - run: npx electron-builder --config electron-builder.config.cjs --linux AppImage --x64
+      - run: npx electron-builder --config electron-builder.config.cjs --linux AppImage --x64 --publish never
       - run:
           name: Stage Linux artifacts
           command: |
@@ -164,7 +167,7 @@ jobs:
             npm run build
             npm version $env:version --no-git-tag-version
             $env:RIVJU_REQUIRE_SIGNING = '1'
-            npx electron-builder --config electron-builder.config.cjs --win nsis --x64
+            npx electron-builder --config electron-builder.config.cjs --win nsis --x64 --publish never
             New-Item -ItemType Directory -Force C:\rivju-release\artifacts\win-x64
             Copy-Item release\*.exe,release\*.yml,release\*.blockmap C:\rivju-release\artifacts\win-x64 -ErrorAction SilentlyContinue
             if (-not (Get-ChildItem C:\rivju-release\artifacts\win-x64\*.exe)) { throw 'Windows installer is missing' }

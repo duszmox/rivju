@@ -16,3 +16,8 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# signing material
+*.p12
+*.p8
+*.mobileprovision

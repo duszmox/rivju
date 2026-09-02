@@ -30,7 +30,9 @@ Add these variables to the `release` context:
   Contents read/write permission.
 - `CSC_LINK` and `CSC_KEY_PASSWORD`: Developer ID Application certificate and
   password used by electron-builder.
-- `APPLE_API_KEY`: contents of the App Store Connect `.p8` key.
+- `APPLE_API_KEY_BASE64`: base64-encoded contents of the App Store Connect `.p8`
+  key (single line). The macOS job decodes it to a temporary file and points
+  `APPLE_API_KEY` at that path.
 - `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`: App Store Connect key identifiers.
 - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET`: Azure
   workload credentials.

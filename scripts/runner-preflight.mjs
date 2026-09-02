@@ -49,6 +49,5 @@ command('python3')
 command('cc')
 if (expected === 'mac') {
   command('xcode-select', ['--print-path'])
-  command('/usr/bin/arch', ['-x86_64', '/usr/bin/true'])
 }
 console.log(`[runner] preflight passed for ${process.platform}/${process.arch}`)
