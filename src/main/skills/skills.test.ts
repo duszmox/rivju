@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -79,7 +79,6 @@ describe('SKILL.md frontmatter', () => {
     expect(source).toContain('description: Find correctness bugs.')
   })
 })
-
 describe('run skill resolution', () => {
   const skillsDir = '/data/skills'
   const projectRef = { id: 'p1', instanceId: 'i1', pathWithNamespace: 'group/app' }
@@ -423,7 +422,7 @@ describe('importing from a checkout', () => {
     const bySlug = Object.fromEntries(scan.candidates.map((item) => [item.directory, item]))
 
     expect(bySlug['house-style'].symlinked).toBe(true)
-    expect(bySlug['house-style'].realPath).toBe(shared)
+    expect(bySlug['house-style'].realPath).toBe(realpathSync(shared))
     expect(bySlug['house-style'].name).toBe('house-style')
     expect(bySlug['house-style'].description).toBe('The team house style.')
 

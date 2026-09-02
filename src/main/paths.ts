@@ -5,6 +5,7 @@ import path from 'node:path'
 export interface AppPaths {
   userData: string
   dbFile: string
+  dbBackupsDir: string
   logsDir: string
   reposDir: string
   worktreesDir: string
@@ -24,6 +25,7 @@ export function resolvePaths(): AppPaths {
   return {
     userData,
     dbFile: path.join(userData, 'rivju.db'),
+    dbBackupsDir: path.join(userData, 'backups'),
     logsDir: path.join(userData, 'logs'),
     reposDir: path.join(userData, 'repos'),
     worktreesDir: path.join(userData, 'worktrees'),
@@ -35,6 +37,7 @@ export function resolvePaths(): AppPaths {
 }
 
 export function ensureDirs(paths: AppPaths): void {
+  mkdirSync(paths.dbBackupsDir, { recursive: true })
   mkdirSync(paths.logsDir, { recursive: true })
   mkdirSync(paths.reposDir, { recursive: true })
   mkdirSync(paths.worktreesDir, { recursive: true })

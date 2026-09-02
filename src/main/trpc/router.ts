@@ -16,6 +16,7 @@ import { reposRouter } from './routers/repos.ts'
 import { reviewsRouter } from './routers/reviews.ts'
 import { settingsRouter } from './routers/settings.ts'
 import { skillsRouter } from './routers/skills.ts'
+import { updatesRouter } from './routers/updates.ts'
 
 export const appRouter = router({
   system: {
@@ -75,6 +76,7 @@ export const appRouter = router({
   reviews: reviewsRouter,
   skills: skillsRouter,
   settings: settingsRouter,
+  updates: updatesRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Plus, Trash2, TriangleAlert } from 'lucide-react'
+import {
+  Download,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
@@ -23,6 +30,7 @@ type Effort = (typeof EFFORTS)[number]
 type ModelInfo = RouterOutput['settings']['defaults']['models'][number]
 type UiTheme = NonNullable<RouterOutput['settings']['uiTheme']>
 type TicketRule = RouterOutput['settings']['ticketNavigation'][number]
+type UpdateState = RouterOutput['updates']['state']
 
 const THEME_OPTIONS: Array<{ value: UiTheme; label: string }> = [
   { value: 'system', label: 'System' },
@@ -57,6 +65,13 @@ function Settings() {
   const setTicketNavigation = useMutation(
     trpc.settings.setTicketNavigation.mutationOptions(),
   )
+  const updates = useQuery({
+    ...trpc.updates.state.queryOptions(),
+    refetchInterval: 1_000,
+  })
+  const checkUpdate = useMutation(trpc.updates.check.mutationOptions())
+  const downloadUpdate = useMutation(trpc.updates.download.mutationOptions())
+  const installUpdate = useMutation(trpc.updates.install.mutationOptions())
 
   const refresh = (): void => {
     void queryClient.invalidateQueries({
@@ -83,7 +98,10 @@ function Settings() {
     setDefaults.error ??
     setProject.error ??
     setTurnLimits.error ??
-    setTicketNavigation.error
+    setTicketNavigation.error ??
+    checkUpdate.error ??
+    downloadUpdate.error ??
+    installUpdate.error
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-10">
@@ -110,6 +128,31 @@ function Settings() {
         <p className="mt-4 text-sm text-destructive">
           {error instanceof Error ? error.message : 'Could not save'}
         </p>
+      ) : null}
+
+      {updates.data ? (
+        <UpdateSettings
+          state={updates.data}
+          checking={checkUpdate.isPending}
+          downloading={downloadUpdate.isPending}
+          onCheck={() =>
+            checkUpdate.mutate(undefined, {
+              onSuccess: () =>
+                void queryClient.invalidateQueries({
+                  queryKey: trpc.updates.state.pathKey(),
+                }),
+            })
+          }
+          onDownload={() =>
+            downloadUpdate.mutate(undefined, {
+              onSuccess: () =>
+                void queryClient.invalidateQueries({
+                  queryKey: trpc.updates.state.pathKey(),
+                }),
+            })
+          }
+          onInstall={() => installUpdate.mutate(undefined)}
+        />
       ) : null}
 
       <section className="island-shell mt-6 rounded-2xl p-6">
@@ -315,6 +358,108 @@ function Settings() {
       </section>
     </div>
   )
+}
+
+function UpdateSettings({
+  state,
+  checking,
+  downloading,
+  onCheck,
+  onDownload,
+  onInstall,
+}: {
+  state: UpdateState
+  checking: boolean
+  downloading: boolean
+  onCheck: () => void
+  onDownload: () => void
+  onInstall: () => void
+}) {
+  const channelName = state.channel === 'nightly' ? 'Nightly' : 'Stable'
+  return (
+    <section className="island-shell mt-6 rounded-2xl p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="font-semibold text-(--sea-ink)">Updates</h2>
+          <p className="mt-1 text-sm text-(--sea-ink-soft)">
+            {channelName} channel · version {state.currentVersion}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!state.enabled || checking || state.status === 'checking'}
+          onClick={onCheck}
+        >
+          <RefreshCw
+            className={state.status === 'checking' ? 'animate-spin' : ''}
+          />
+          {state.status === 'checking' ? 'Checking…' : 'Check for updates'}
+        </Button>
+      </div>
+
+      <p className="mt-4 text-sm text-(--sea-ink)">
+        {updateStatusMessage(state)}
+      </p>
+      {state.status === 'downloading' && state.downloadPercent !== null ? (
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/10">
+          <div
+            className="h-full rounded-full bg-primary transition-[width]"
+            style={{
+              width: `${Math.max(0, Math.min(100, state.downloadPercent))}%`,
+            }}
+          />
+        </div>
+      ) : null}
+      {state.releaseNotes ? (
+        <details className="mt-4 text-sm text-(--sea-ink-soft)">
+          <summary className="cursor-pointer font-medium text-(--sea-ink)">
+            Release notes
+          </summary>
+          <p className="mt-2 whitespace-pre-wrap">{state.releaseNotes}</p>
+        </details>
+      ) : null}
+      <div className="mt-4 flex flex-wrap gap-3">
+        {state.status === 'available' ? (
+          <Button disabled={downloading} onClick={onDownload}>
+            <Download /> {downloading ? 'Starting…' : 'Download update'}
+          </Button>
+        ) : null}
+        {state.status === 'downloaded' ? (
+          <Button disabled={state.reviewRunning} onClick={onInstall}>
+            <RotateCcw /> Restart and install
+          </Button>
+        ) : null}
+      </div>
+      {state.status === 'downloaded' && state.reviewRunning ? (
+        <p className="mt-2 text-xs text-destructive">
+          Finish or cancel active reviews before installing.
+        </p>
+      ) : null}
+    </section>
+  )
+}
+
+function updateStatusMessage(state: UpdateState): string {
+  if (state.message) return state.message
+  switch (state.status) {
+    case 'disabled':
+      return 'Updates are disabled in this build.'
+    case 'idle':
+      return 'Ready to check for updates.'
+    case 'checking':
+      return 'Checking GitHub Releases…'
+    case 'available':
+      return `Version ${state.availableVersion ?? 'unknown'} is available.`
+    case 'downloading':
+      return `Downloading ${Math.round(state.downloadPercent ?? 0)}%.`
+    case 'downloaded':
+      return `Version ${state.downloadedVersion ?? 'unknown'} is ready to install.`
+    case 'up-to-date':
+      return 'rivju is up to date.'
+    case 'error':
+      return 'The update operation failed.'
+  }
 }
 
 function TicketNavigationForm({

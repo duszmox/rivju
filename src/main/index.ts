@@ -7,11 +7,19 @@ import { applyMigrations, interruptStaleRuns } from './db/migrate.ts'
 import { ensureDirs, resolvePaths } from './paths.ts'
 import { runRepoGc } from './repo/service.ts'
 import { disposeReviewRuns } from './review/runner.ts'
+import {
+  configureReleaseIdentity,
+  getReleaseChannel,
+} from './release-channel.ts'
 import { seedBuiltinSkills } from './skills/seed.ts'
 import { applyUiTheme, getUiTheme } from './ui-theme.ts'
 import { registerTrpcIpc } from './trpc/ipc.ts'
 import type { TrpcContext } from './trpc/context.ts'
 import { createMainWindow } from './window.ts'
+import { configureUpdates, disposeUpdates } from './updates/service.ts'
+
+const releaseChannel = getReleaseChannel()
+configureReleaseIdentity(releaseChannel)
 
 async function bootstrap(): Promise<void> {
   // Packaged mac builds take the dock icon from the bundled icon.icns; in dev
@@ -31,14 +39,17 @@ async function bootstrap(): Promise<void> {
   ensureDirs(paths)
 
   const db = openDatabase(paths.dbFile)
-  applyMigrations(db, paths.migrationsDir)
+  await applyMigrations(db, paths.migrationsDir, paths.dbBackupsDir)
   interruptStaleRuns(db)
   await seedBuiltinSkills(db, paths.skillsDir)
   await runRepoGc()
     .then(({ removed }) => {
-      if (removed > 0) console.log(`[rivju] removed ${removed} orphaned/expired worktree(s)`)
+      if (removed > 0)
+        console.log(`[rivju] removed ${removed} orphaned/expired worktree(s)`)
     })
-    .catch((err) => console.warn('[rivju] repository cache cleanup failed', err))
+    .catch((err) =>
+      console.warn('[rivju] repository cache cleanup failed', err),
+    )
 
   const context: TrpcContext = { db }
   registerTrpcIpc(context)
@@ -54,7 +65,9 @@ async function bootstrap(): Promise<void> {
           `[rivju] preflight ok: account=${state.account?.email ?? 'unknown'} models=${state.models.length}${state.fromCache ? ' (cached)' : ''}`,
         )
       } else if (state.status === 'failed') {
-        console.warn(`[rivju] preflight failed: ${state.reason} — ${state.message}`)
+        console.warn(
+          `[rivju] preflight failed: ${state.reason} — ${state.message}`,
+        )
       }
     })
     .catch((err) => {
@@ -62,6 +75,7 @@ async function bootstrap(): Promise<void> {
     })
 
   void createMainWindow()
+  configureUpdates(releaseChannel)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createMainWindow()
@@ -112,6 +126,7 @@ if (!gotSingleInstanceLock) {
   })
 
   app.on('before-quit', () => {
+    disposeUpdates()
     disposeReviewRuns()
     closeDatabase()
   })

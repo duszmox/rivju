@@ -1,0 +1,390 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@7.2.1
+  win: circleci/windows@5.0.0
+
+commands:
+  attach_release_workspace:
+    steps:
+      - attach_workspace:
+          at: /tmp/rivju-release
+      - run:
+          name: Load release metadata
+          command: cat /tmp/rivju-release/release.env >> "$BASH_ENV"
+
+jobs:
+  metadata:
+    parameters:
+      channel:
+        type: enum
+        enum: [stable, nightly, next]
+    docker:
+      - image: cimg/node:22.14
+    steps:
+      - checkout
+      - run:
+          name: Resolve release metadata
+          command: |
+            set -euo pipefail
+            mkdir -p /tmp/rivju-release
+            output=/tmp/rivju-release/github-output
+            export GITHUB_OUTPUT="$output"
+            if [[ "<< parameters.channel >>" != nightly ]]; then
+              node scripts/resolve-release.mjs \
+                --channel "<< parameters.channel >>" \
+                --tag "$CIRCLE_TAG" \
+                --github-output
+              git fetch origin main
+              git merge-base --is-ancestor "$CIRCLE_SHA1" origin/main || {
+                echo 'Release tags must point to a commit on main.' >&2
+                exit 1
+              }
+            else
+              git fetch --tags --force
+              stable_tag="$(git tag --list --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+              node scripts/resolve-release.mjs \
+                --channel nightly \
+                --stable-tag "$stable_tag" \
+                --date "$(date -u +%Y%m%d)" \
+                --run-number "$CIRCLE_BUILD_NUM" \
+                --sha "$CIRCLE_SHA1" \
+                --github-output
+            fi
+            while IFS='=' read -r key value; do
+              printf 'export %s=%q\n' "$key" "$value"
+            done < "$output" > /tmp/rivju-release/release.env
+            printf 'export RELEASE_SHA=%q\n' "$CIRCLE_SHA1" >> /tmp/rivju-release/release.env
+            cat /tmp/rivju-release/release.env
+      - persist_to_workspace:
+          root: /tmp/rivju-release
+          paths:
+            - release.env
+
+  quality:
+    docker:
+      - image: cimg/node:22.14
+    steps:
+      - checkout
+      - attach_release_workspace
+      - run: npm ci
+      - run: npm run check:release
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: node --test scripts/*.test.mjs
+      - run: npm --prefix npm/rivju test
+
+  build_mac:
+    parameters:
+      arch:
+        type: enum
+        enum: [arm64, x64]
+    macos:
+      xcode: 26.6.0
+    resource_class: m4pro.medium
+    steps:
+      - checkout
+      - attach_release_workspace
+      - node/install:
+          node-version: '22.14.0'
+      - run: node scripts/runner-preflight.mjs mac
+      - run: npm ci
+      - run: npm run build
+      - run: npm version "$version" --no-git-tag-version
+      - run:
+          name: Build, sign, and notarize
+          command: |
+            set -euo pipefail
+            key_path="$TMPDIR/AuthKey_${APPLE_API_KEY_ID}.p8"
+            printf '%s' "$APPLE_API_KEY" > "$key_path"
+            chmod 600 "$key_path"
+            trap 'rm -f "$key_path"' EXIT
+            export APPLE_API_KEY="$key_path"
+            export RIVJU_REQUIRE_SIGNING=1
+            npx electron-builder --config electron-builder.config.cjs --mac dmg zip --<< parameters.arch >>
+      - run:
+          name: Stage macOS artifacts
+          command: |
+            mkdir -p /tmp/rivju-release/artifacts/mac-<< parameters.arch >>
+            cp release/*.dmg release/*.zip release/*.yml release/*.blockmap /tmp/rivju-release/artifacts/mac-<< parameters.arch >>/ 2>/dev/null || true
+            test -n "$(find /tmp/rivju-release/artifacts/mac-<< parameters.arch >> -name '*.dmg' -print -quit)"
+      - persist_to_workspace:
+          root: /tmp/rivju-release
+          paths:
+            - artifacts/mac-<< parameters.arch >>
+
+  build_linux:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    steps:
+      - checkout
+      - attach_release_workspace
+      - node/install:
+          node-version: '22.14.0'
+      - run: node scripts/runner-preflight.mjs linux
+      - run:
+          name: Install packaging tools
+          command: sudo apt-get update && sudo apt-get install --no-install-recommends -y libopenjp2-tools rpm
+      - run: npm ci
+      - run: npm run build
+      - run: npm version "$version" --no-git-tag-version
+      - run: npx electron-builder --config electron-builder.config.cjs --linux AppImage --x64
+      - run:
+          name: Stage Linux artifacts
+          command: |
+            mkdir -p /tmp/rivju-release/artifacts/linux-x64
+            cp release/*.AppImage release/*.yml release/*.blockmap /tmp/rivju-release/artifacts/linux-x64/ 2>/dev/null || true
+            test -n "$(find /tmp/rivju-release/artifacts/linux-x64 -name '*.AppImage' -print -quit)"
+      - persist_to_workspace:
+          root: /tmp/rivju-release
+          paths:
+            - artifacts/linux-x64
+
+  build_windows:
+    executor: win/server-2022
+    steps:
+      - checkout
+      - attach_workspace:
+          at: C:\rivju-release
+      - run:
+          name: Build, sign, and stage Windows x64
+          shell: powershell.exe
+          command: |
+            Get-Content C:\rivju-release\release.env | ForEach-Object {
+              if ($_ -match '^export ([^=]+)=(.*)$') {
+                [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+              }
+            }
+            nvm install 22.14.0
+            nvm use 22.14.0
+            node --version
+            npm ci
+            npm run build
+            npm version $env:version --no-git-tag-version
+            $env:RIVJU_REQUIRE_SIGNING = '1'
+            npx electron-builder --config electron-builder.config.cjs --win nsis --x64
+            New-Item -ItemType Directory -Force C:\rivju-release\artifacts\win-x64
+            Copy-Item release\*.exe,release\*.yml,release\*.blockmap C:\rivju-release\artifacts\win-x64 -ErrorAction SilentlyContinue
+            if (-not (Get-ChildItem C:\rivju-release\artifacts\win-x64\*.exe)) { throw 'Windows installer is missing' }
+      - persist_to_workspace:
+          root: C:\rivju-release
+          paths:
+            - artifacts\win-x64
+
+  publish_github:
+    docker:
+      - image: cimg/node:22.14
+    steps:
+      - checkout
+      - attach_release_workspace
+      - run: npm ci --ignore-scripts
+      - run:
+          name: Assemble and verify release
+          command: |
+            set -euo pipefail
+            mkdir release-assets
+            find /tmp/rivju-release/artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.AppImage' -o -name '*.exe' -o -name '*.blockmap' \) -exec cp {} release-assets/ \;
+            manifest_channel=latest
+            [[ "$channel" == nightly ]] && manifest_channel=nightly
+            node scripts/merge-mac-update-manifests.mjs \
+              "/tmp/rivju-release/artifacts/mac-arm64/${manifest_channel}-mac.yml" \
+              "/tmp/rivju-release/artifacts/mac-x64/${manifest_channel}-mac.yml" \
+              "release-assets/${manifest_channel}-mac.yml"
+            cp "/tmp/rivju-release/artifacts/linux-x64/${manifest_channel}-linux.yml" release-assets/
+            cp "/tmp/rivju-release/artifacts/win-x64/${manifest_channel}.yml" release-assets/
+            (cd release-assets && sha256sum * > SHA256SUMS)
+      - run:
+          name: Publish immutable GitHub Release
+          command: |
+            export RELEASE_TAG="$tag"
+            export RELEASE_NAME="$release_name"
+            export RELEASE_CHANNEL="$channel"
+            node scripts/publish-github-release.mjs
+      - store_artifacts:
+          path: release-assets
+          destination: release-assets
+
+  publish_npm:
+    docker:
+      - image: cimg/node:22.14
+    steps:
+      - checkout
+      - attach_release_workspace
+      - run: sudo npm install --global npm@11
+      - run:
+          name: Prepare npm package
+          command: |
+            cd npm/rivju
+            npm version "$version" --no-git-tag-version
+            npm test
+            npm pack --dry-run
+      - run:
+          name: Publish with CircleCI OIDC
+          command: |
+            export NPM_ID_TOKEN="$(circleci run oidc get --claims '{"aud":"npm:registry.npmjs.org"}')"
+            cd npm/rivju
+            npm publish --tag "$dist_tag"
+
+workflows:
+  pull_request_ci:
+    jobs:
+      - metadata:
+          name: metadata-ci
+          channel: nightly
+          filters: &ci_filters
+            branches:
+              ignore: main
+            tags:
+              ignore: /.*/
+      - quality:
+          name: quality-ci
+          requires: [metadata-ci]
+          filters: *ci_filters
+
+  nightly_release:
+    jobs:
+      - metadata:
+          name: metadata-nightly
+          channel: nightly
+          filters: &nightly_filters
+            branches:
+              only: main
+            tags:
+              ignore: /.*/
+      - quality:
+          name: quality-nightly
+          requires: [metadata-nightly]
+          filters: *nightly_filters
+      - build_mac:
+          name: build-mac-nightly-<< matrix.arch >>
+          context: release
+          matrix:
+            parameters:
+              arch: [arm64, x64]
+          requires: [quality-nightly]
+          filters: *nightly_filters
+      - build_linux:
+          name: build-linux-nightly
+          requires: [quality-nightly]
+          filters: *nightly_filters
+      - build_windows:
+          name: build-windows-nightly
+          context: release
+          requires: [quality-nightly]
+          filters: *nightly_filters
+      - publish_github:
+          name: publish-github-nightly
+          context: release
+          requires:
+            - build-mac-nightly-arm64
+            - build-mac-nightly-x64
+            - build-linux-nightly
+            - build-windows-nightly
+          filters: *nightly_filters
+      - publish_npm:
+          name: publish-npm-nightly
+          context: release
+          requires: [publish-github-nightly]
+          filters: *nightly_filters
+
+  stable_release:
+    jobs:
+      - metadata:
+          name: metadata-stable
+          channel: stable
+          filters: &stable_filters
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v\d+\.\d+\.\d+$/
+      - quality:
+          name: quality-stable
+          requires: [metadata-stable]
+          filters: *stable_filters
+      - hold-stable:
+          type: approval
+          requires: [quality-stable]
+          filters: *stable_filters
+      - build_mac:
+          name: build-mac-stable-<< matrix.arch >>
+          context: release
+          matrix:
+            parameters:
+              arch: [arm64, x64]
+          requires: [hold-stable]
+          filters: *stable_filters
+      - build_linux:
+          name: build-linux-stable
+          requires: [hold-stable]
+          filters: *stable_filters
+      - build_windows:
+          name: build-windows-stable
+          context: release
+          requires: [hold-stable]
+          filters: *stable_filters
+      - publish_github:
+          name: publish-github-stable
+          context: release
+          requires:
+            - build-mac-stable-arm64
+            - build-mac-stable-x64
+            - build-linux-stable
+            - build-windows-stable
+          filters: *stable_filters
+      - publish_npm:
+          name: publish-npm-stable
+          context: release
+          requires: [publish-github-stable]
+          filters: *stable_filters
+
+  release_candidate:
+    jobs:
+      - metadata:
+          name: metadata-next
+          channel: next
+          filters: &next_filters
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v\d+\.\d+\.\d+-rc\.\d+$/
+      - quality:
+          name: quality-next
+          requires: [metadata-next]
+          filters: *next_filters
+      - hold-next:
+          type: approval
+          requires: [quality-next]
+          filters: *next_filters
+      - build_mac:
+          name: build-mac-next-<< matrix.arch >>
+          context: release
+          matrix:
+            parameters:
+              arch: [arm64, x64]
+          requires: [hold-next]
+          filters: *next_filters
+      - build_linux:
+          name: build-linux-next
+          requires: [hold-next]
+          filters: *next_filters
+      - build_windows:
+          name: build-windows-next
+          context: release
+          requires: [hold-next]
+          filters: *next_filters
+      - publish_github:
+          name: publish-github-next
+          context: release
+          requires:
+            - build-mac-next-arm64
+            - build-mac-next-x64
+            - build-linux-next
+            - build-windows-next
+          filters: *next_filters
+      - publish_npm:
+          name: publish-npm-next
+          context: release
+          requires: [publish-github-next]
+          filters: *next_filters

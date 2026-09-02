@@ -1,5 +1,5 @@
-import { drizzle  } from 'drizzle-orm/better-sqlite3'
-import type {BetterSQLite3Database} from 'drizzle-orm/better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import * as schema from './schema.ts'
 
@@ -22,8 +22,15 @@ export function openDatabase(file: string): RivjuDatabase {
 }
 
 export function getDb(): RivjuDatabase {
-  if (!opened) throw new Error('Database not opened — openDb() must run at app boot')
+  if (!opened)
+    throw new Error('Database not opened — openDb() must run at app boot')
   return opened.db
+}
+
+export async function backupDatabase(destination: string): Promise<void> {
+  if (!opened)
+    throw new Error('Database not opened — cannot create a migration backup')
+  await opened.sqlite.backup(destination)
 }
 
 export function closeDatabase(): void {

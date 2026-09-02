@@ -1,0 +1,30 @@
+{
+  "name": "rivju",
+  "version": "0.1.0-rc.0",
+  "description": "Install the rivju desktop app from its verified GitHub release",
+  "license": "MIT",
+  "author": "rivju contributors",
+  "type": "module",
+  "bin": {
+    "rivju": "./bin/rivju.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/duszmox/rivju.git",
+    "directory": "npm/rivju"
+  },
+  "homepage": "https://github.com/duszmox/rivju#readme",
+  "bugs": "https://github.com/duszmox/rivju/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

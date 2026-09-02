@@ -29,6 +29,26 @@ npm install
 npm run dev
 ```
 
+## Install
+
+Signed desktop installers are attached to
+[GitHub Releases](https://github.com/duszmox/rivju/releases). The small npm
+bootstrapper downloads the matching installer and verifies its SHA-256 digest:
+
+```bash
+npx rivju@latest   # stable
+npx rivju@next     # release candidate
+npx rivju@nightly  # latest main build
+```
+
+Stable and Nightly are separate applications with separate data directories,
+so they can be installed side by side. Packaged builds check their fixed update
+channel after startup and every four minutes; downloading and installing an
+update always requires an explicit action in Settings.
+
+Maintainer setup and release procedures are in
+[docs/releasing.md](docs/releasing.md).
+
 The planning docs (architecture, phase briefs, and reports) live in
 `docs/plan/`. Note that the Nitro/SSR deployment instructions historically in
 this file are obsolete — rivju is a local Electron app, not a web service.
