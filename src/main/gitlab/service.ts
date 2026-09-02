@@ -6,6 +6,10 @@ import { GitlabApiError, GitlabClient } from './client.ts'
 import { gitlabProjectSchema } from './schemas.ts'
 import type { GitlabInstanceRow, ProjectRow } from '../db/schema.ts'
 import type { GitlabMergeRequest, GitlabProject } from './schemas.ts'
+import {
+  findTicketLinks,
+  getTicketNavigationRules,
+} from '../tickets/navigation.ts'
 
 /**
  * Service layer between the tRPC routers and (client, vault, db). Holds the
@@ -65,6 +69,9 @@ export interface MergeRequestDetail {
   totalAdditions: number
   totalDeletions: number
   lineStatsComplete: boolean
+  ticketNavigationConfigured: boolean
+  ticketNavigationError: string | null
+  linkedTickets: ReturnType<typeof findTicketLinks>
   files: {
     newPath: string
     oldPath: string
@@ -557,6 +564,26 @@ export async function fetchMergeRequestDetail(
     client.listMergeRequestDiffs(gitlabProjectId, iid),
   ])
 
+  const ticketRules = getTicketNavigationRules()
+  let linkedTickets: ReturnType<typeof findTicketLinks> = []
+  let ticketNavigationError: string | null = null
+  if (ticketRules.length > 0) {
+    try {
+      const commits = await client.listMergeRequestCommits(gitlabProjectId, iid)
+      linkedTickets = findTicketLinks(
+        commits.map((commit) => ({
+          shortId: commit.short_id,
+          title: commit.title,
+          message: commit.message,
+        })),
+        ticketRules,
+      )
+    } catch (error) {
+      ticketNavigationError =
+        error instanceof Error ? error.message : String(error)
+    }
+  }
+
   const currentHeadSha = mr.diff_refs?.head_sha ?? null
   const acceptLatest = options.acceptLatest ?? true
   await persistMrHierarchy(instance, gitlabProjectId, mr, {
@@ -608,6 +635,9 @@ export async function fetchMergeRequestDetail(
         file.collapsed !== true &&
         file.too_large !== true,
     ),
+    ticketNavigationConfigured: ticketRules.length > 0,
+    ticketNavigationError,
+    linkedTickets,
     files: filesWithStats,
   }
 }

@@ -52,6 +52,7 @@ import {
 import { Textarea } from '#/components/ui/textarea.tsx'
 import { useRuns } from '#/components/runs/runs-store.tsx'
 import { VerifyPanel } from '#/components/review/verify-panel.tsx'
+import { hasNewlySettledRun } from '#/components/review/review-query-sync.ts'
 import { ErrorSurface } from '#/components/errors/error-surface.tsx'
 import { useTrpc, useTrpcClient } from '#/lib/trpc.tsx'
 import { useIsDark } from '#/lib/theme.ts'
@@ -85,6 +86,14 @@ export function ReviewWorkspace(props: Coordinates & {
       ? 1_500
       : false,
   })
+  const shouldRefreshSettledRun = hasNewlySettledRun(
+    review.data?.runs ?? [],
+    liveRuns,
+  )
+
+  useEffect(() => {
+    if (shouldRefreshSettledRun) void review.refetch()
+  }, [review.refetch, shouldRefreshSettledRun])
 
   useEffect(() => {
     if (props.initialRunId) setRunId(props.initialRunId)

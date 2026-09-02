@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  gitlabCommitSchema,
   gitlabDiffFileSchema,
   gitlabErrorSchema,
   gitlabMergeRequestSchema,
@@ -9,6 +10,7 @@ import {
   gitlabVersionSchema,
 } from './schemas.ts'
 import type {
+  GitlabCommit,
   GitlabDiffFile,
   GitlabMergeRequest,
   GitlabPersonalAccessToken,
@@ -31,7 +33,12 @@ export class GitlabApiError extends Error {
   /** Seconds from the `Retry-After` header, when the server sent one. */
   readonly retryAfterSeconds: number | null
 
-  constructor(status: number, url: string, message: string, retryAfterSeconds: number | null) {
+  constructor(
+    status: number,
+    url: string,
+    message: string,
+    retryAfterSeconds: number | null,
+  ) {
     super(`GitLab API ${status} on ${url}: ${message}`)
     this.name = 'GitlabApiError'
     this.status = status
@@ -81,7 +88,10 @@ export class GitlabClient {
   constructor(options: GitlabClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '')
     this.token = options.token
-    this.maxConcurrent = Math.max(1, options.maxConcurrent ?? DEFAULT_CONCURRENCY)
+    this.maxConcurrent = Math.max(
+      1,
+      options.maxConcurrent ?? DEFAULT_CONCURRENCY,
+    )
     const impl = options.fetchImpl ?? globalThis.fetch
     this.fetchImpl = (url, init) => impl(url, init)
   }
@@ -101,9 +111,18 @@ export class GitlabClient {
   }
 
   /** GET with a zod-parsed JSON body. Unknown fields are stripped by the schema. */
-  async getJson<T>(path: string, schema: z.ZodType<T>, options: RequestOptions = {}): Promise<T> {
+  async getJson<T>(
+    path: string,
+    schema: z.ZodType<T>,
+    options: RequestOptions = {},
+  ): Promise<T> {
     const response = await this.request(path, options)
-    return parseJsonBody<T>(await response.text(), response.status, response.url || path, schema)
+    return parseJsonBody<T>(
+      await response.text(),
+      response.status,
+      response.url || path,
+      schema,
+    )
   }
 
   /**
@@ -127,11 +146,17 @@ export class GitlabClient {
     let pages = 0
 
     while (url !== null && pages < maxPages) {
-      const response = await this.request(url, { signal: requestOptions.signal })
+      const response = await this.request(url, {
+        signal: requestOptions.signal,
+      })
       const text = await response.text()
       const parsed = z.array(schema).safeParse(JSON.parse(text))
       if (!parsed.success) {
-        throw parseErrorFrom(parsed.error.issues, response.status, response.url || url)
+        throw parseErrorFrom(
+          parsed.error.issues,
+          response.status,
+          response.url || url,
+        )
       }
       out.push(...parsed.data)
       pages++
@@ -154,7 +179,9 @@ export class GitlabClient {
    * Personal access token introspection (returns scopes). Only exists on
    * GitLab 16+; on older instances this returns null and scopes stay unknown.
    */
-  async tokenSelf(options: RequestOptions = {}): Promise<GitlabPersonalAccessToken | null> {
+  async tokenSelf(
+    options: RequestOptions = {},
+  ): Promise<GitlabPersonalAccessToken | null> {
     try {
       return await this.getJson(
         '/api/v4/personal_access_tokens/self',
@@ -162,7 +189,11 @@ export class GitlabClient {
         options,
       )
     } catch (err) {
-      if (err instanceof GitlabApiError && (err.status === 404 || err.status === 403)) return null
+      if (
+        err instanceof GitlabApiError &&
+        (err.status === 404 || err.status === 403)
+      )
+        return null
       throw err
     }
   }
@@ -173,7 +204,12 @@ export class GitlabClient {
   ): Promise<GitlabProject[]> {
     return this.paginate('/api/v4/projects', gitlabProjectSchema, {
       ...options,
-      query: { membership: true, simple: true, order_by: 'last_activity_at', ...query },
+      query: {
+        membership: true,
+        simple: true,
+        order_by: 'last_activity_at',
+        ...query,
+      },
     })
   }
 
@@ -182,7 +218,10 @@ export class GitlabClient {
     query: Record<string, string | number | boolean | undefined> = {},
     options: RequestOptions & { maxPages?: number } = {},
   ): Promise<GitlabMergeRequest[]> {
-    return this.paginate('/api/v4/merge_requests', gitlabMergeRequestSchema, { ...options, query })
+    return this.paginate('/api/v4/merge_requests', gitlabMergeRequestSchema, {
+      ...options,
+      query,
+    })
   }
 
   /** Secondary per-project browse view. */
@@ -223,13 +262,28 @@ export class GitlabClient {
     )
   }
 
+  async listMergeRequestCommits(
+    projectId: number,
+    iid: number,
+    options: RequestOptions = {},
+  ): Promise<GitlabCommit[]> {
+    return this.paginate(
+      `/api/v4/projects/${projectId}/merge_requests/${iid}/commits`,
+      gitlabCommitSchema,
+      { ...options, query: { per_page: 100, ...options.query } },
+    )
+  }
+
   // ---- internals -----------------------------------------------------------
 
   /**
    * `path` may be a full absolute URL (pagination next-links) — `new URL(path,
    * base)` keeps absolute URLs intact and joins relative ones.
    */
-  private async requestWithRetries(path: string, options: RequestOptions): Promise<Response> {
+  private async requestWithRetries(
+    path: string,
+    options: RequestOptions,
+  ): Promise<Response> {
     const url = this.buildUrl(path)
     const method = options.method ?? 'GET'
     let attempt429 = 0
@@ -244,9 +298,14 @@ export class GitlabClient {
           headers: {
             'PRIVATE-TOKEN': this.token,
             Accept: 'application/json',
-            ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+            ...(options.body !== undefined
+              ? { 'Content-Type': 'application/json' }
+              : {}),
           },
-          body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+          body:
+            options.body !== undefined
+              ? JSON.stringify(options.body)
+              : undefined,
           signal: attemptSignal,
         })
       } catch (err) {
@@ -260,7 +319,12 @@ export class GitlabClient {
 
       if (response.status === 429) {
         if (attempt429 >= MAX_429_RETRIES) {
-          throw new GitlabApiError(429, url, 'rate limited, retries exhausted', parseRetryAfter(response))
+          throw new GitlabApiError(
+            429,
+            url,
+            'rate limited, retries exhausted',
+            parseRetryAfter(response),
+          )
         }
         attempt429++
         await sleep(retryDelayMs(response, attempt429))
@@ -283,7 +347,10 @@ export class GitlabClient {
     }
   }
 
-  private async apiError(response: Response, url: string): Promise<GitlabApiError> {
+  private async apiError(
+    response: Response,
+    url: string,
+  ): Promise<GitlabApiError> {
     let message = response.statusText || 'request failed'
     try {
       const parsed = gitlabErrorSchema.safeParse(await response.json())
@@ -297,7 +364,12 @@ export class GitlabClient {
     } catch {
       // non-JSON error body — keep statusText
     }
-    return new GitlabApiError(response.status, url, message, parseRetryAfter(response))
+    return new GitlabApiError(
+      response.status,
+      url,
+      message,
+      parseRetryAfter(response),
+    )
   }
 
   private buildUrl(path: string, query?: RequestOptions['query']): string {
@@ -332,7 +404,12 @@ export class GitlabClient {
   }
 }
 
-function parseJsonBody<T>(text: string, status: number, url: string, schema: z.ZodType<T>): T {
+function parseJsonBody<T>(
+  text: string,
+  status: number,
+  url: string,
+  schema: z.ZodType<T>,
+): T {
   let raw: unknown
   try {
     raw = JSON.parse(text)

@@ -14,7 +14,14 @@ import { fileURLToPath } from 'node:url'
 import { closeDatabase, openDatabase } from '../db/client.ts'
 import type { RivjuDatabase } from '../db/client.ts'
 import { applyMigrations } from '../db/migrate.ts'
-import { finding, gitlabInstance, mergeRequest, project } from '../db/schema.ts'
+import {
+  finding,
+  gitlabInstance,
+  mergeRequest,
+  project,
+  setting,
+} from '../db/schema.ts'
+import { setTicketNavigationRules } from '../tickets/navigation.ts'
 import {
   addInstance,
   deleteInstance,
@@ -101,6 +108,17 @@ function fixtureFetch(url: string | URL | Request): Response {
   }
   if (p === '/api/v4/projects/3201/merge_requests/101/diffs')
     return respond(mergeRequestDiffs)
+  if (p === '/api/v4/projects/3201/merge_requests/101/commits')
+    return respond([
+      {
+        id: 'abcdef1234567890',
+        short_id: 'abcdef12',
+        title: 'ACME-42 guard empty anchors',
+        message: 'ACME-42 guard empty anchors',
+        web_url: `${BASE}/acme/rivju-core/-/commit/abcdef1234567890`,
+        authored_date: '2026-08-30T10:00:00Z',
+      },
+    ])
   return respond({ message: 'not found' }, 404)
 }
 
@@ -123,6 +141,7 @@ beforeEach(() => {
   db.delete(mergeRequest).run()
   db.delete(project).run()
   db.delete(gitlabInstance).run()
+  db.delete(setting).run()
   servedVersion = versionFixture.version
   servedHeadSha = mergeRequestDetail.diff_refs.head_sha
 })
@@ -347,6 +366,32 @@ describe('MR detail', () => {
       'aa11bb22cc33dd44ee55ff66001122334455667',
     )
     expect(mrRows[0].iid).toBe(101)
+  })
+
+  it('finds configured ticket ids in MR commit messages', async () => {
+    setTicketNavigationRules([
+      {
+        id: 'd6226bf7-c460-4c53-8b82-479546328a31',
+        name: 'Acme Jira',
+        issuePattern: '[A-Z]+-\\d+',
+        linkTemplate: 'https://jira.example.com/browse/$0',
+      },
+    ])
+    const instanceId = (await seedInstance()).id
+
+    const detail = await fetchMergeRequestDetail(instanceId, 3201, 101)
+
+    expect(detail.ticketNavigationConfigured).toBe(true)
+    expect(detail.ticketNavigationError).toBeNull()
+    expect(detail.linkedTickets).toEqual([
+      {
+        id: 'ACME-42',
+        url: 'https://jira.example.com/browse/ACME-42',
+        ruleName: 'Acme Jira',
+        commitShortIds: ['abcdef12'],
+        commitTitles: ['ACME-42 guard empty anchors'],
+      },
+    ])
   })
 
   it('counts patch lines without counting file headers', () => {

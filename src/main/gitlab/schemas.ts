@@ -64,6 +64,15 @@ export const gitlabDiffRefsSchema = z.object({
   start_sha: z.string(),
 })
 
+export const gitlabCommitSchema = z.object({
+  id: z.string(),
+  short_id: z.string(),
+  title: z.string(),
+  message: z.string(),
+  web_url: z.string().nullish(),
+  authored_date: isoDate.nullish(),
+})
+
 export const gitlabMergeRequestSchema = z.object({
   id: z.number(),
   iid: z.number(),
@@ -129,6 +138,7 @@ export type GitlabUser = z.infer<typeof gitlabUserSchema>
 export type GitlabVersion = z.infer<typeof gitlabVersionSchema>
 export type GitlabProject = z.infer<typeof gitlabProjectSchema>
 export type GitlabMergeRequest = z.infer<typeof gitlabMergeRequestSchema>
+export type GitlabCommit = z.infer<typeof gitlabCommitSchema>
 export type GitlabDiffRefs = z.infer<typeof gitlabDiffRefsSchema>
 export type GitlabDiffFile = z.infer<typeof gitlabDiffFileSchema>
 export type GitlabPersonalAccessToken = z.infer<

@@ -7,9 +7,11 @@ import {
   FilePlus,
   FilePen,
   GitMerge,
+  ExternalLink,
   LoaderCircle,
   Play,
   RefreshCw,
+  Ticket,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
@@ -95,6 +97,9 @@ function MergeRequestDetail() {
     totalAdditions,
     totalDeletions,
     lineStatsComplete,
+    ticketNavigationConfigured,
+    ticketNavigationError,
+    linkedTickets,
   } = detail.data
   const totalChangedLines = totalAdditions + totalDeletions
 
@@ -198,6 +203,52 @@ function MergeRequestDetail() {
           )}
         </div>
       </dl>
+
+      {ticketNavigationConfigured ? (
+        <section className="island-shell mt-6 rounded-2xl p-5">
+          <div className="flex items-center gap-2">
+            <Ticket className="size-4 text-[var(--lagoon-deep)]" />
+            <h2 className="text-sm font-semibold text-(--sea-ink)">
+              Linked tickets
+            </h2>
+            <span className="text-xs text-(--sea-ink-soft)">
+              ({linkedTickets.length})
+            </span>
+          </div>
+          {ticketNavigationError ? (
+            <p className="mt-3 text-sm text-destructive">
+              Commit messages could not be checked: {ticketNavigationError}
+            </p>
+          ) : linkedTickets.length === 0 ? (
+            <p className="mt-3 text-sm text-(--sea-ink-soft)">
+              No configured ticket IDs were found in the commit messages.
+            </p>
+          ) : (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {linkedTickets.map((ticket) => (
+                <li key={ticket.url}>
+                  <a
+                    href={ticket.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`${ticket.ruleName} · ${ticket.commitTitles.join(' · ')}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 font-mono text-xs font-semibold text-[var(--lagoon-deep)] hover:border-[var(--lagoon-deep)]"
+                  >
+                    {ticket.id}
+                    <span className="font-sans font-normal text-(--sea-ink-soft)">
+                      {ticket.commitShortIds.length}{' '}
+                      {ticket.commitShortIds.length === 1
+                        ? 'commit'
+                        : 'commits'}
+                    </span>
+                    <ExternalLink className="size-3" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {diffRefs ? (
         <RepositoryPreparation
@@ -347,8 +398,7 @@ function RepositoryPreparation(props: {
   const phase = status.data?.phase ?? (prepare.isPending ? 'cloning' : 'idle')
   const failed = !props.hasNewVersion && (prepare.isError || phase === 'error')
   const ready = !props.hasNewVersion && phase === 'ready'
-  const needsScoping =
-    !props.hasNewVersion && phase === 'needs_scoping'
+  const needsScoping = !props.hasNewVersion && phase === 'needs_scoping'
   return (
     <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm">
       {props.hasNewVersion ? (
@@ -391,10 +441,10 @@ function RepositoryPreparation(props: {
           {props.hasNewVersion
             ? 'Pull latest to fetch and prepare the new head.'
             : failed
-            ? prepare.error instanceof Error
-              ? prepare.error.message
-              : status.data?.detail
-            : (status.data?.detail ?? 'Starting repository preparation…')}
+              ? prepare.error instanceof Error
+                ? prepare.error.message
+                : status.data?.detail
+              : (status.data?.detail ?? 'Starting repository preparation…')}
         </p>
         {props.pullError ? (
           <p className="mt-1 text-xs text-destructive">{props.pullError}</p>

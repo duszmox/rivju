@@ -13,6 +13,11 @@ import {
   MIN_MAX_TURNS,
 } from '../../settings/service.ts'
 import { getUiTheme, setUiTheme } from '../../ui-theme.ts'
+import {
+  getTicketNavigationRules,
+  setTicketNavigationRules,
+  ticketNavigationRulesSchema,
+} from '../../tickets/navigation.ts'
 import { publicProcedure, router } from '../base.ts'
 
 const effort = z.enum(EFFORT_LEVELS)
@@ -23,7 +28,12 @@ export const settingsRouter = router({
   defaults: publicProcedure.query(() => getGlobalDefaults()),
 
   setDefaults: publicProcedure
-    .input(z.object({ model: z.string().min(1).nullable(), effort: effort.nullable() }))
+    .input(
+      z.object({
+        model: z.string().min(1).nullable(),
+        effort: effort.nullable(),
+      }),
+    )
     .mutation(({ input }) => setGlobalDefaults(input)),
 
   projectDefaults: publicProcedure.query(() => listProjectDefaults()),
@@ -60,7 +70,8 @@ export const settingsRouter = router({
     )
     .query(({ input }) =>
       describeEffectiveSelection(
-        input.projectId ?? findProjectIdByCoordinates(input.instanceId, input.gitlabProjectId),
+        input.projectId ??
+          findProjectIdByCoordinates(input.instanceId, input.gitlabProjectId),
       ),
     ),
 
@@ -69,4 +80,10 @@ export const settingsRouter = router({
   setUiTheme: publicProcedure
     .input(z.object({ theme }))
     .mutation(({ input }) => setUiTheme(input.theme)),
+
+  ticketNavigation: publicProcedure.query(() => getTicketNavigationRules()),
+
+  setTicketNavigation: publicProcedure
+    .input(ticketNavigationRulesSchema)
+    .mutation(({ input }) => setTicketNavigationRules(input)),
 })
