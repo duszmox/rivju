@@ -163,9 +163,7 @@ export function Sidebar() {
         </summary>
         <div className="mt-1 space-y-0.5 pb-1">
           {recentProjects.isPending ? (
-            <p className="px-2 py-1 text-xs text-(--sea-ink-soft)">
-              Loading…
-            </p>
+            <p className="px-2 py-1 text-xs text-(--sea-ink-soft)">Loading…</p>
           ) : null}
           {recentProjects.data?.length === 0 ? (
             <p className="px-2 py-1 text-xs text-(--sea-ink-soft)">
@@ -217,7 +215,9 @@ export function Sidebar() {
             const description =
               run.lastTool ??
               run.message ??
-              (run.status === 'queued' ? `queue position ${run.queuePosition ?? '…'}` : run.phase) ??
+              (run.status === 'queued'
+                ? `queue position ${run.queuePosition ?? '…'}`
+                : run.phase) ??
               (live ? 'waiting…' : null)
             const content = (
               <>
@@ -241,7 +241,9 @@ export function Sidebar() {
                 ) : null}
 
                 {description ? (
-                  <p className="mt-1 truncate text-xs text-(--sea-ink)">{description}</p>
+                  <p className="mt-1 truncate text-xs text-(--sea-ink)">
+                    {description}
+                  </p>
                 ) : null}
 
                 <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-(--sea-ink-soft)">
