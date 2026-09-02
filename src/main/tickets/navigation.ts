@@ -37,6 +37,14 @@ export interface TicketLink {
   commitTitles: string[]
 }
 
+export interface TicketTextMatch {
+  id: string
+  url: string
+  ruleName: string
+  start: number
+  end: number
+}
+
 export function getTicketNavigationRules(): TicketNavigationRule[] {
   const stored = readSetting(TICKET_NAVIGATION_KEY)
   if (!stored) return []
@@ -90,6 +98,45 @@ export function findTicketLinks(
     }
   }
   return [...links.values()]
+}
+
+export function findTicketMatches(
+  text: string,
+  rules: TicketNavigationRule[],
+): TicketTextMatch[] {
+  const candidates: TicketTextMatch[] = []
+  const searchable = text.slice(0, 20_000)
+  for (const rule of rules) {
+    const pattern = compilePattern(rule.issuePattern)
+    for (const match of searchable.matchAll(pattern)) {
+      const start = match.index
+      const id = match[0]
+      const url = expandLink(rule.linkTemplate, match)
+      if (!isHttpUrl(url)) continue
+      candidates.push({
+        id,
+        url,
+        ruleName: rule.name,
+        start,
+        end: start + id.length,
+      })
+      if (candidates.length >= 100) break
+    }
+  }
+
+  candidates.sort((left, right) =>
+    left.start === right.start
+      ? right.end - left.end
+      : left.start - right.start,
+  )
+  const matches: TicketTextMatch[] = []
+  let consumedUntil = 0
+  for (const candidate of candidates) {
+    if (candidate.start < consumedUntil) continue
+    matches.push(candidate)
+    consumedUntil = candidate.end
+  }
+  return matches
 }
 
 function validatePattern(rule: TicketNavigationRule): void {

@@ -13,7 +13,7 @@ import {
   RefreshCw,
   Ticket,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Button } from '#/components/ui/button.tsx'
 import { Markdown } from '#/components/ui/markdown.tsx'
 import {
@@ -100,6 +100,7 @@ function MergeRequestDetail() {
     ticketNavigationConfigured,
     ticketNavigationError,
     linkedTickets,
+    titleTicketMatches,
   } = detail.data
   const totalChangedLines = totalAdditions + totalDeletions
 
@@ -131,7 +132,7 @@ function MergeRequestDetail() {
             </a>
           </p>
           <h1 className="display-title mt-1 text-3xl font-bold text-(--sea-ink)">
-            {mr.title}
+            <TicketLinkedTitle title={mr.title} matches={titleTicketMatches} />
           </h1>
         </div>
         <div className="flex flex-wrap items-stretch justify-end gap-3">
@@ -322,6 +323,45 @@ function MergeRequestDetail() {
         initialRunId={runId}
       />
     </div>
+  )
+}
+
+function TicketLinkedTitle({
+  title,
+  matches,
+}: {
+  title: string
+  matches: Array<{
+    id: string
+    url: string
+    ruleName: string
+    start: number
+    end: number
+  }>
+}) {
+  let cursor = 0
+  return (
+    <>
+      {matches.map((match) => {
+        const before = title.slice(cursor, match.start)
+        cursor = match.end
+        return (
+          <Fragment key={`${match.start}:${match.url}`}>
+            {before}
+            <a
+              href={match.url}
+              target="_blank"
+              rel="noreferrer"
+              title={`Open ${match.id} in ${match.ruleName}`}
+              className="text-[var(--lagoon-deep)] underline decoration-[var(--lagoon-deep)]/35 underline-offset-4 hover:decoration-current"
+            >
+              {title.slice(match.start, match.end)}
+            </a>
+          </Fragment>
+        )
+      })}
+      {title.slice(cursor)}
+    </>
   )
 }
 

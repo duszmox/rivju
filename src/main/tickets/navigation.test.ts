@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findTicketLinks } from './navigation.ts'
+import { findTicketLinks, findTicketMatches } from './navigation.ts'
 
 const rules = [
   {
@@ -70,5 +70,17 @@ describe('ticket navigation', () => {
         [{ ...rules[0], issuePattern: '[' }],
       ),
     ).toThrow(/Invalid issue pattern/)
+  })
+
+  it('returns exact ranges for ticket ids in an MR title', () => {
+    expect(findTicketMatches('Fix ACME-42 before release', rules)).toEqual([
+      {
+        id: 'ACME-42',
+        url: 'https://jira.example.com/browse/ACME-42',
+        ruleName: 'Acme Jira',
+        start: 4,
+        end: 11,
+      },
+    ])
   })
 })

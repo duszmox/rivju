@@ -63,6 +63,7 @@ let workDir: string
 /** Current GitLab version served by the fake fetch; tests can downgrade it. */
 let servedVersion: string = versionFixture.version
 let servedHeadSha: string = mergeRequestDetail.diff_refs.head_sha
+let servedTitle: string = mergeRequestDetail.title
 
 /**
  * A fixture-backed GitLab API: routes URL paths to the recorded JSON files so
@@ -103,6 +104,7 @@ function fixtureFetch(url: string | URL | Request): Response {
   if (p === '/api/v4/projects/3201/merge_requests/101') {
     return respond({
       ...mergeRequestDetail,
+      title: servedTitle,
       diff_refs: { ...mergeRequestDetail.diff_refs, head_sha: servedHeadSha },
     })
   }
@@ -144,6 +146,7 @@ beforeEach(() => {
   db.delete(setting).run()
   servedVersion = versionFixture.version
   servedHeadSha = mergeRequestDetail.diff_refs.head_sha
+  servedTitle = mergeRequestDetail.title
 })
 
 afterAll(() => {
@@ -377,12 +380,22 @@ describe('MR detail', () => {
         linkTemplate: 'https://jira.example.com/browse/$0',
       },
     ])
+    servedTitle = 'ACME-42 Guard hallucinated anchors'
     const instanceId = (await seedInstance()).id
 
     const detail = await fetchMergeRequestDetail(instanceId, 3201, 101)
 
     expect(detail.ticketNavigationConfigured).toBe(true)
     expect(detail.ticketNavigationError).toBeNull()
+    expect(detail.titleTicketMatches).toEqual([
+      {
+        id: 'ACME-42',
+        url: 'https://jira.example.com/browse/ACME-42',
+        ruleName: 'Acme Jira',
+        start: 0,
+        end: 7,
+      },
+    ])
     expect(detail.linkedTickets).toEqual([
       {
         id: 'ACME-42',

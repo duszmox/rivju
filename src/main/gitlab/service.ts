@@ -8,6 +8,7 @@ import type { GitlabInstanceRow, ProjectRow } from '../db/schema.ts'
 import type { GitlabMergeRequest, GitlabProject } from './schemas.ts'
 import {
   findTicketLinks,
+  findTicketMatches,
   getTicketNavigationRules,
 } from '../tickets/navigation.ts'
 
@@ -72,6 +73,7 @@ export interface MergeRequestDetail {
   ticketNavigationConfigured: boolean
   ticketNavigationError: string | null
   linkedTickets: ReturnType<typeof findTicketLinks>
+  titleTicketMatches: ReturnType<typeof findTicketMatches>
   files: {
     newPath: string
     oldPath: string
@@ -565,6 +567,7 @@ export async function fetchMergeRequestDetail(
   ])
 
   const ticketRules = getTicketNavigationRules()
+  const titleTicketMatches = findTicketMatches(mr.title, ticketRules)
   let linkedTickets: ReturnType<typeof findTicketLinks> = []
   let ticketNavigationError: string | null = null
   if (ticketRules.length > 0) {
@@ -638,6 +641,7 @@ export async function fetchMergeRequestDetail(
     ticketNavigationConfigured: ticketRules.length > 0,
     ticketNavigationError,
     linkedTickets,
+    titleTicketMatches,
     files: filesWithStats,
   }
 }
