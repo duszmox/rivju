@@ -1,5 +1,5 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
-import type { EffortLevel, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { EffortLevel, SandboxSettings, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { and, count, desc, eq, isNotNull } from 'drizzle-orm'
 import { appendFile, mkdir, stat } from 'node:fs/promises'
 import path from 'node:path'
@@ -765,7 +765,12 @@ function requirePreflight() {
   return preflight
 }
 
-function reviewSandbox() {
+export function reviewSandbox(platform: NodeJS.Platform = process.platform): SandboxSettings {
+  // Claude Code supports sandboxing in WSL2, which Node reports as Linux, but
+  // not in native Windows processes. Disable it explicitly there so reviews
+  // still run under rivju's read-only tool policy.
+  if (platform === 'win32') return { enabled: false }
+
   return {
     enabled: true,
     failIfUnavailable: false,
