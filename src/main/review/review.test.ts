@@ -13,7 +13,7 @@ import { processFindingSubmission } from './mcp.ts'
 import { isReadOnlyBash } from './permissions.ts'
 import { spawnReviewProcess } from './process.ts'
 import { LiveTokenAccumulator } from './usage.ts'
-import { listRuns, parseBoundedSettingNumber } from './runner.ts'
+import { listRuns, parseBoundedSettingNumber, reviewSandbox } from './runner.ts'
 import { verifyFindingLocation } from './verifier.ts'
 import { getReview, updateFindingTriage } from './ui.ts'
 
@@ -134,6 +134,15 @@ describe('verification gate', () => {
 })
 
 describe('read-only execution boundary', () => {
+  it('disables the unsupported sandbox on native Windows but keeps it in WSL2', () => {
+    expect(reviewSandbox('win32')).toEqual({ enabled: false })
+    expect(reviewSandbox('linux')).toMatchObject({
+      enabled: true,
+      allowUnsandboxedCommands: false,
+      network: { allowedDomains: [], strictAllowlist: true },
+    })
+  })
+
   it('allows only approved Bash command shapes', () => {
     expect(isReadOnlyBash('git diff --stat HEAD~1')).toBe(true)
     expect(isReadOnlyBash("sed -n '1,40p' src/file.ts")).toBe(true)

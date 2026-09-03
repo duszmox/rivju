@@ -36,6 +36,10 @@ signing/notarization, Windows Trusted Signing for candidates and stable
 releases, immutable assets, and OIDC npm publishing are retained. Windows
 Nightlies remain unsigned until trusted signing is configured.
 
+Native Windows review sessions explicitly disable Claude Code's unsupported
+OS sandbox. WSL2 sessions still use the Linux sandbox, and rivju's read-only
+tool policy remains active on both.
+
 ## Verification
 
 - CircleCI CLI accepts `.circleci/config.yml` as valid.
